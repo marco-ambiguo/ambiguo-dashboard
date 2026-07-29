@@ -18,10 +18,6 @@
           <img class="brand-full" src="assets/logo-ambiguo.png" alt="Ambiguo" />
           <img class="brand-mark" src="assets/favicon.png" alt="Ambiguo" />
         </div>
-        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Riduci barra laterale" aria-expanded="true">
-          <span class="toggle-open">←</span>
-          <span class="toggle-closed">→</span>
-        </button>
       </div>
       <nav class="nav" aria-label="Navigazione principale">
         <button class="nav-link active" data-view="dashboard" title="Dashboard"><span class="nav-icon">⌂</span><span class="nav-label">Dashboard</span></button>
@@ -32,6 +28,13 @@
         <button class="nav-link" data-view="distributori" title="Distributori"><span class="nav-icon">▣</span><span class="nav-label">Distributori</span></button>
         <button class="nav-link" data-view="impostazioni" title="Impostazioni"><span class="nav-icon">⚙</span><span class="nav-label">Impostazioni</span></button>
       </nav>
+      <div class="sidebar-collapse-row">
+        <button class="sidebar-toggle nav-link" id="sidebarToggle" type="button" aria-label="Riduci barra laterale" aria-expanded="true" title="Riduci menu">
+          <span class="nav-icon toggle-open">←</span>
+          <span class="nav-icon toggle-closed">→</span>
+          <span class="nav-label toggle-label">Riduci menu</span>
+        </button>
+      </div>
       <div class="sidebar-actions">
         <button class="btn primary full" id="quickOrderBtn" title="Nuovo ordine"><span class="action-icon">＋</span><span class="action-label">Nuovo ordine</span></button>
         <button class="btn ghost full" id="quickSaleBtn" title="Nuovo ordine cliente"><span class="action-icon">↗</span><span class="action-label">Nuovo ordine cliente</span></button>
