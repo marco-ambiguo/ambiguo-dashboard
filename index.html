@@ -12,23 +12,30 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <img src="assets/logo-ambiguo.jpeg" alt="Ambiguo" />
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <img class="brand-full" src="assets/logo-ambiguo.png" alt="Ambiguo" />
+          <img class="brand-mark" src="assets/favicon.png" alt="Ambiguo" />
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Riduci barra laterale" aria-expanded="true">
+          <span class="toggle-open">←</span>
+          <span class="toggle-closed">→</span>
+        </button>
       </div>
       <nav class="nav" aria-label="Navigazione principale">
-        <button class="nav-link active" data-view="dashboard">Dashboard</button>
-        <button class="nav-link" data-view="cantina">Cantina</button>
-        <button class="nav-link" data-view="ordini">Ordini dist.</button>
-        <button class="nav-link" data-view="vendite">Ordini clienti</button>
-        <button class="nav-link" data-view="clienti">Clienti</button>
-        <button class="nav-link" data-view="distributori">Distributori</button>
-        <button class="nav-link" data-view="impostazioni">Impostazioni</button>
+        <button class="nav-link active" data-view="dashboard" title="Dashboard"><span class="nav-icon">⌂</span><span class="nav-label">Dashboard</span></button>
+        <button class="nav-link" data-view="cantina" title="Cantina"><span class="nav-icon">◇</span><span class="nav-label">Cantina</span></button>
+        <button class="nav-link" data-view="ordini" title="Ordini distributori"><span class="nav-icon">↙</span><span class="nav-label">Ordini dist.</span></button>
+        <button class="nav-link" data-view="vendite" title="Ordini clienti"><span class="nav-icon">↗</span><span class="nav-label">Ordini clienti</span></button>
+        <button class="nav-link" data-view="clienti" title="Clienti"><span class="nav-icon">◎</span><span class="nav-label">Clienti</span></button>
+        <button class="nav-link" data-view="distributori" title="Distributori"><span class="nav-icon">▣</span><span class="nav-label">Distributori</span></button>
+        <button class="nav-link" data-view="impostazioni" title="Impostazioni"><span class="nav-icon">⚙</span><span class="nav-label">Impostazioni</span></button>
       </nav>
       <div class="sidebar-actions">
-        <button class="btn primary full" id="quickOrderBtn">Nuovo ordine</button>
-        <button class="btn ghost full" id="quickSaleBtn">Nuovo ordine cliente</button>
-        <button class="btn ghost full" id="quickWineBtn">Nuovo vino</button>
+        <button class="btn primary full" id="quickOrderBtn" title="Nuovo ordine"><span class="action-icon">＋</span><span class="action-label">Nuovo ordine</span></button>
+        <button class="btn ghost full" id="quickSaleBtn" title="Nuovo ordine cliente"><span class="action-icon">↗</span><span class="action-label">Nuovo ordine cliente</span></button>
+        <button class="btn ghost full" id="quickWineBtn" title="Nuovo vino"><span class="action-icon">◇</span><span class="action-label">Nuovo vino</span></button>
       </div>
     </aside>
 

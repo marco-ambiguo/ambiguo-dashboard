@@ -592,6 +592,28 @@
   function shortMoney(v){ return money(v).replace(',00',''); }
   function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
 
+  const SIDEBAR_KEY = 'ambiguo_sidebar_collapsed';
+  const appShell = document.querySelector('.app-shell');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+
+  function applySidebarState(collapsed) {
+    appShell?.classList.toggle('sidebar-collapsed', collapsed);
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+      sidebarToggle.setAttribute('aria-label', collapsed ? 'Espandi barra laterale' : 'Riduci barra laterale');
+      sidebarToggle.title = collapsed ? 'Espandi menu' : 'Riduci menu';
+    }
+  }
+
+  const savedSidebarState = localStorage.getItem(SIDEBAR_KEY) === 'true';
+  applySidebarState(savedSidebarState);
+
+  sidebarToggle?.addEventListener('click', () => {
+    const collapsed = !appShell?.classList.contains('sidebar-collapsed');
+    localStorage.setItem(SIDEBAR_KEY, String(collapsed));
+    applySidebarState(collapsed);
+  });
+
   document.querySelectorAll('.nav-link').forEach(btn => {
     btn.addEventListener('click', () => {
       currentView = btn.dataset.view;
