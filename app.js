@@ -138,6 +138,7 @@
     document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
     Object.entries(views).forEach(([n,el])=>el?.classList.toggle('active',n===currentView));
     document.getElementById('pageTitle').textContent=titles[currentView];
+    renderNotificationMenu();
     if(currentView==='dashboard') renderDashboard();
     if(currentView==='cantina') renderCantina();
     if(currentView==='ordini') renderOrdini();
@@ -159,22 +160,88 @@
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
       <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap"><canvas id="chartInventory"></canvas></div></div><div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap"><canvas id="chartBottles"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>
-      <div class="card table-card" style="margin-top:16px"><div class="section-head" style="padding:18px 18px 0"><div><h2>Notifiche</h2><p class="small-muted">Ordini ancora da pagare o da incassare.</p></div></div>${notificationsPanel()}</div>`;
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>`;
     drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
     drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
     drawDonutChart('chartDistributor',distributorBreakdown()); bindInlineActions();
   }
-  function notificationsPanel(){
+  function notificationRows(){
     const unpaidOrders=state.orders.filter(o=>(o.paymentStatus||'da pagare')!=='pagato' && o.status!=='annullato');
     const unpaidSales=state.sales.filter(s=>!['pagato','annullato'].includes(s.status));
-    const rows=[
-      ...unpaidOrders.map(o=>({type:'Da pagare',who:distributorName(o.distributorId),date:o.date,code:o.code,total:o.totals?.grossTotal,action:'edit-order',id:o.id})),
-      ...unpaidSales.map(s=>({type:'Da incassare',who:customerName(s.customerId),date:s.date,code:s.code,total:s.totals?.total,action:'edit-sale',id:s.id}))
+    return [
+      ...unpaidOrders.map(o=>({
+        type:'Da pagare',
+        tone:'pay',
+        title:distributorName(o.distributorId),
+        body:`Ordine distributore ${o.code || '—'} · ${dateIT(o.date)}`,
+        total:o.totals?.grossTotal,
+        action:'edit-order',
+        id:o.id,
+        date:o.date
+      })),
+      ...unpaidSales.map(s=>({
+        type:'Da incassare',
+        tone:'cash',
+        title:customerName(s.customerId),
+        body:`Ordine cliente ${s.code || '—'} · ${dateIT(s.date)}`,
+        total:s.totals?.total,
+        action:'edit-sale',
+        id:s.id,
+        date:s.date
+      }))
     ].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  }
+
+  function notificationsPanel(){
+    const rows=notificationRows();
     if(!rows.length) return `<div class="empty">Nessuna notifica: non risultano ordini aperti, da pagare o da incassare.</div>`;
-    return `<div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Da chi / a chi</th><th>Codice</th><th>Data</th><th>Importo</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge">${esc(r.type)}</span></td><td class="cell-title">${esc(r.who)}</td><td>${esc(r.code)}</td><td>${dateIT(r.date)}</td><td>${money(r.total)}</td><td><button class="btn small secondary" data-action="${r.action}" data-id="${r.id}">Apri</button></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Da chi / a chi</th><th>Codice</th><th>Data</th><th>Importo</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td><span class="badge">${esc(r.type)}</span></td><td class="cell-title">${esc(r.title)}</td><td>${esc(r.body.split(' · ')[0])}</td><td>${esc(r.body.split(' · ')[1]||'—')}</td><td>${money(r.total)}</td><td><button class="btn small secondary" data-action="${r.action}" data-id="${r.id}">Apri</button></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function renderNotificationMenu(){
+    const list=document.getElementById('notificationList');
+    const subtitle=document.getElementById('notificationSubtitle');
+    const dot=document.getElementById('notificationDot');
+    if(!list) return;
+    const rows=notificationRows();
+    if(subtitle) subtitle.textContent = rows.length ? `${rows.length} notifiche da leggere` : 'Nessuna notifica aperta';
+    if(dot) dot.hidden = rows.length === 0;
+    if(!rows.length){
+      list.innerHTML = `<div class="notification-empty"><strong>Tutto pulito.</strong><span>Non ci sono ordini da pagare o da incassare.</span></div>`;
+      return;
+    }
+    list.innerHTML = rows.map(r => `
+      <button class="notification-item" type="button" data-action="${r.action}" data-id="${r.id}">
+        <span class="notification-status ${r.tone}">${esc(r.type)}</span>
+        <span class="notification-main">
+          <strong>${esc(r.title)}</strong>
+          <small>${esc(r.body)}</small>
+        </span>
+        <span class="notification-amount">${money(r.total)}</span>
+      </button>
+    `).join('');
+    list.querySelectorAll('[data-action]').forEach(btn=>btn.addEventListener('click',()=>{
+      closeNotificationMenu();
+      handleAction(btn.dataset.action, btn.dataset.id);
+    }));
+  }
+
+  function openNotificationMenu(){
+    const menu=document.getElementById('notificationMenu');
+    const btn=document.getElementById('notificationBtn');
+    if(!menu) return;
+    renderNotificationMenu();
+    menu.hidden=false;
+    btn?.setAttribute('aria-expanded','true');
+  }
+
+  function closeNotificationMenu(){
+    const menu=document.getElementById('notificationMenu');
+    const btn=document.getElementById('notificationBtn');
+    if(!menu) return;
+    menu.hidden=true;
+    btn?.setAttribute('aria-expanded','false');
   }
 
   function renderCantina(){
@@ -608,17 +675,37 @@
   const savedSidebarState = localStorage.getItem(SIDEBAR_KEY) === 'true';
   applySidebarState(savedSidebarState);
 
-  sidebarToggle?.addEventListener('click', () => {
+  sidebarToggle?.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
     const collapsed = !appShell?.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_KEY, String(collapsed));
     applySidebarState(collapsed);
   });
 
-  document.querySelectorAll('.nav-link').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentView = btn.dataset.view;
+  document.querySelectorAll('.nav-link[data-view]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      const nextView = event.currentTarget?.dataset?.view;
+      if (!nextView || !views[nextView]) return;
+      currentView = nextView;
+      closeNotificationMenu();
       render();
     });
+  });
+
+  document.getElementById('notificationBtn')?.addEventListener('click', event => {
+    event.stopPropagation();
+    const menu=document.getElementById('notificationMenu');
+    if(menu?.hidden) openNotificationMenu();
+    else closeNotificationMenu();
+  });
+  document.getElementById('notificationClose')?.addEventListener('click', closeNotificationMenu);
+  document.addEventListener('click', event => {
+    const wrap=document.querySelector('.notifications-wrap');
+    if(wrap && !wrap.contains(event.target)) closeNotificationMenu();
+  });
+  document.addEventListener('keydown', event => {
+    if(event.key==='Escape') closeNotificationMenu();
   });
 
   document.getElementById('quickOrderBtn')?.addEventListener('click', () => openOrderModal());
