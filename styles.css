@@ -160,13 +160,39 @@ tbody tr:hover { background: rgba(255,255,255,.35); }
 .sale-line-grid { display: grid; grid-template-columns: 2fr .55fr .78fr .68fr; gap: 8px; align-items: end; }
 .order-line-grid .field input, .order-line-grid .field select, .sale-line-grid .field input, .sale-line-grid .field select { padding: 8px 9px; border-radius: 12px; font-size: 12.5px; }
 .order-line-grid .field label, .sale-line-grid .field label { font-size: 10.5px; }
-.summary-box { background: #151515; color: #fff; border-radius: 18px; padding: 14px; display: grid; gap: 8px; }
+.summary-box {
+  background: rgba(255,255,255,.62);
+  color: var(--ink);
+  border: 1px solid rgba(0,0,0,.07);
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 18px 44px rgba(25,22,18,.055);
+}
 .soft-summary { background: rgba(255,255,255,.58); color: var(--ink); border: 1px solid rgba(0,0,0,.07); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
-.soft-summary .summary-row strong, .soft-summary strong { color: var(--ink); }
-.soft-summary .summary-row span { color: var(--muted); }
-.summary-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
-.summary-row strong { color: #fff; font-weight: 680; }
-.line-summary, .sale-line-grid .line-summary { grid-column: 1 / -1; min-width: 0; margin-top: 4px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px 14px; padding: 10px 12px; }
+.summary-box .summary-row strong, .summary-box strong { color: var(--ink); }
+.summary-box .summary-row span { color: var(--muted); }
+.summary-row {
+  display: grid;
+  grid-template-columns: minmax(92px, max-content) max-content;
+  justify-content: start;
+  align-items: baseline;
+  column-gap: 12px;
+  font-size: 12px;
+}
+.summary-row strong { font-weight: 650; letter-spacing: -.01em; }
+.line-summary, .sale-line-grid .line-summary {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  justify-content: start;
+  align-items: center;
+  gap: 8px 26px;
+  padding: 10px 14px;
+}
 
 .toast-root { position: fixed; right: 18px; bottom: 18px; z-index: 30; display: grid; gap: 8px; }
 .toast { background: rgba(20,20,20,.92); color: #fff; padding: 11px 13px; border-radius: 16px; box-shadow: var(--shadow); animation: slideIn .18s ease; max-width: 340px; }
@@ -917,3 +943,21 @@ h3,
   .notifications-wrap { order: 10 !important; }
   .notification-menu { right: 0 !important; left: auto !important; width: min(360px, calc(100vw - 28px)) !important; }
 }
+
+
+/* Light totals: no black blocks, labels and amounts stay visually paired. */
+#orderTotals.summary-box,
+#saleTotals.summary-box,
+#wineLiveTotals.summary-box {
+  background: rgba(255,255,255,.64);
+  border-color: rgba(0,0,0,.075);
+}
+#orderTotals .summary-row,
+#saleTotals .summary-row,
+#wineLiveTotals .summary-row {
+  grid-template-columns: minmax(130px, max-content) max-content;
+}
+.line-summary .summary-row {
+  grid-template-columns: max-content max-content;
+}
+
