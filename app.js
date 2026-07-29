@@ -271,9 +271,9 @@
       if(mode) window.__cantinaMode=mode.value;
       if(sort&&sort.value){ const [key,dir]=sort.value.split(':'); sortState={key,dir}; }
       let wines=filteredWines().filter(w=>(!tag.value||w.tag===tag.value)&&(!dist.value||w.distributorId===dist.value));
-      if(stock.value==='available') wines=wines.filter(w=>w.quantity>state.settings.lowStockThreshold);
-      if(stock.value==='low') wines=wines.filter(w=>wineStatus(w)==='giacenza bassa');
-      if(stock.value==='empty') wines=wines.filter(w=>wineStatus(w)==='esaurito');
+      if(stock.value==='available') wines=wines.filter(w=>Number(w.quantity||0)>0);
+      if(stock.value==='low') wines=wines.filter(w=>Number(w.quantity||0)>0 && Number(w.quantity||0)<=Number(state.settings.lowStockThreshold||3));
+      if(stock.value==='empty') wines=wines.filter(w=>Number(w.quantity||0)<=0);
       wines.sort((a,b)=>sortCompare(a,b));
       document.querySelector('#view-cantina .table-card').innerHTML=wines.length?cantinaTable(wines,window.__cantinaMode||'compact'):`<div class="empty">Nessun vino con questi filtri.</div>`;
       bindInlineActions(); bindSortHeaders();
