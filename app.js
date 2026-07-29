@@ -1,7 +1,8 @@
 (function () {
   const S = window.AmbiguoStorage;
   let state = S.load();
-  let currentView = 'dashboard';
+  const VIEW_KEY = 'ambiguo_current_view';
+  let currentView = localStorage.getItem(VIEW_KEY) || 'dashboard';
   let sortState = { key: 'name', dir: 'asc' };
   let orderSortState = { key: 'date', dir: 'desc' };
   let searchTerm = '';
@@ -135,6 +136,8 @@
   function distributorBreakdown(){ const items=activeDistributors().map(d=>({label:d.name,value:0})); state.orders.forEach(o=>{ const it=items.find(x=>x.label===distributorName(o.distributorId)); if(it) it.value+=Number(o.totals?.grossTotal||0); }); return items.filter(i=>i.value>0); }
 
   function render(){
+    if (!views[currentView]) currentView = 'dashboard';
+    localStorage.setItem(VIEW_KEY, currentView);
     document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
     Object.entries(views).forEach(([n,el])=>el?.classList.toggle('active',n===currentView));
     document.getElementById('pageTitle').textContent=titles[currentView];
@@ -678,9 +681,20 @@
   sidebarToggle?.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const activeView = document.querySelector('.nav-link.active[data-view]')?.dataset.view;
+    if (activeView && views[activeView]) currentView = activeView;
+    if (!views[currentView]) currentView = localStorage.getItem(VIEW_KEY) || 'dashboard';
+
     const collapsed = !appShell?.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_KEY, String(collapsed));
     applySidebarState(collapsed);
+
+    requestAnimationFrame(() => {
+      if (!views[currentView]) currentView = 'dashboard';
+      render();
+    });
   });
 
   document.querySelectorAll('.nav-link[data-view]').forEach(btn => {
@@ -688,6 +702,7 @@
       const nextView = event.currentTarget?.dataset?.view;
       if (!nextView || !views[nextView]) return;
       currentView = nextView;
+      localStorage.setItem(VIEW_KEY, currentView);
       closeNotificationMenu();
       render();
     });
