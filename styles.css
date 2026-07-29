@@ -260,3 +260,35 @@ tbody tr:hover { background: #fafafa; }
   .order-line-grid, .sale-line-grid { grid-template-columns: 1fr; }
   .order-line-grid .line-summary, .sale-line-grid .line-summary { grid-template-columns: 1fr; }
 }
+
+/* FINAL FIX: il riepilogo della singola riga ordine è fuori dalla griglia campi */
+.order-line > .line-summary {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-top: 10px !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px 18px !important;
+}
+.order-line > .line-summary .summary-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+}
+.order-line > .line-summary .summary-row span {
+  line-height: 1.15 !important;
+  white-space: normal !important;
+}
+.order-line > .line-summary .summary-row strong {
+  white-space: nowrap !important;
+}
+@media (max-width: 900px) {
+  .order-line > .line-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 560px) {
+  .order-line > .line-summary { grid-template-columns: 1fr !important; }
+}
