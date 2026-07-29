@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ambiguo — Cantina</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="assets/logo-ambiguo.jpeg" alt="Ambiguo" />
+      </div>
+      <nav class="nav" aria-label="Navigazione principale">
+        <button class="nav-link active" data-view="dashboard">Dashboard</button>
+        <button class="nav-link" data-view="cantina">Cantina</button>
+        <button class="nav-link" data-view="ordini">Ordini dist.</button>
+        <button class="nav-link" data-view="vendite">Ordini clienti</button>
+        <button class="nav-link" data-view="clienti">Clienti</button>
+        <button class="nav-link" data-view="distributori">Distributori</button>
+        <button class="nav-link" data-view="impostazioni">Impostazioni</button>
+      </nav>
+      <div class="sidebar-actions">
+        <button class="btn primary full" id="quickOrderBtn">Nuovo ordine</button>
+        <button class="btn ghost full" id="quickSaleBtn">Nuovo ordine cliente</button>
+        <button class="btn ghost full" id="quickWineBtn">Nuovo vino</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Ambiguo cellar system</p>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <input id="globalSearch" class="search" type="search" placeholder="Cerca codice, vino, cantina, distributore…" />
+          <button class="btn secondary" id="exportCsvBtn">Esporta CSV</button>
+        </div>
+      </header>
+
+      <section id="view-dashboard" class="view active"></section>
+      <section id="view-cantina" class="view"></section>
+      <section id="view-ordini" class="view"></section>
+      <section id="view-vendite" class="view"></section>
+      <section id="view-clienti" class="view"></section>
+      <section id="view-distributori" class="view"></section>
+      <section id="view-impostazioni" class="view"></section>
+    </main>
+  </div>
+
+  <div id="modalRoot" class="modal-root" aria-live="polite"></div>
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
