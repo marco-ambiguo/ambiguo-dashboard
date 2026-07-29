@@ -204,3 +204,59 @@ tbody tr:hover { background: #fafafa; }
   .chart-card { padding: 16px; }
   .chart-wrap, .chart-wrap.small { height: 230px; }
 }
+
+/* Fix UX ordine: riepiloghi riga sotto i campi, non laterali */
+.order-line { padding: 12px 14px 14px; }
+.order-line-grid {
+  grid-template-columns: .72fr 1.35fr 1.05fr .52fr .62fr .62fr .72fr .68fr .58fr .58fr .58fr .72fr .52fr .48fr;
+  gap: 8px;
+  align-items: end;
+}
+.order-line-grid .line-summary {
+  grid-column: 1 / -1;
+  min-width: 0;
+  align-self: auto;
+  margin-top: 2px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 18px;
+}
+.line-summary .summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+.line-summary .summary-row span {
+  white-space: normal;
+  line-height: 1.15;
+}
+.line-summary .summary-row strong {
+  white-space: nowrap;
+}
+.sale-line-grid .line-summary {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 2px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 18px;
+}
+
+@media (max-width: 1320px) {
+  .order-line-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .order-line-grid, .sale-line-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .order-line-grid .line-summary, .sale-line-grid .line-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .order-line-grid, .sale-line-grid { grid-template-columns: 1fr; }
+  .order-line-grid .line-summary, .sale-line-grid .line-summary { grid-template-columns: 1fr; }
+}
