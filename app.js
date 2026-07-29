@@ -462,12 +462,43 @@
   function shortMoney(v){ return money(v).replace(',00',''); }
   function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
 
-  document.querySelectorAll('.nav-link').forEach(btn=>btn.addEventListener('click',()=>{ currentView=btn.dataset.view; render(); }));
-  document.getElementById('quickOrderBtn').addEventListener('click',()=>openOrderModal());
-  document.getElementById('quickWineBtn').addEventListener('click',()=>openWineModal());
-  document.getElementById('quickSaleBtn')?.addEventListener('click',()=>openSaleModal());
-  document.getElementById('exportCsvBtn').addEventListener('click',exportCantinaCsv);
-  document.getElementById('globalSearch').addEventListener('input',e=>{ searchTerm=e.target.value; render(); });
-  window.addEventListener('resize',()=>{ if(currentView==='dashboard') renderDashboard(); });
+  document.querySelectorAll('.nav-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentView = btn.dataset.view;
+      render();
+    });
+  });
+
+  document.getElementById('quickOrderBtn')?.addEventListener('click', () => openOrderModal());
+  document.getElementById('quickWineBtn')?.addEventListener('click', () => openWineModal());
+  document.getElementById('quickSaleBtn')?.addEventListener('click', () => openSaleModal());
+  document.getElementById('exportCsvBtn')?.addEventListener('click', exportCantinaCsv);
+  document.getElementById('globalSearch')?.addEventListener('input', e => {
+    searchTerm = e.target.value;
+    render();
+  });
+
+  window.addEventListener('resize', () => {
+    if (currentView === 'dashboard') renderDashboard();
+  });
+
+  // Quando Redis risponde con i dati online, aggiorna lo stato della dashboard.
+  // Questo è il fix che permette di vedere i dati anche da un altro dispositivo.
+  window.addEventListener('ambiguo:onlineLoaded', event => {
+    if (!event.detail || !event.detail.state) return;
+    state = event.detail.state;
+    render();
+    if (typeof toast === 'function') toast('Dati caricati online');
+  });
+
+  window.addEventListener('ambiguo:onlineSaved', () => {
+    console.log('Dati salvati online su Redis.');
+  });
+
+  window.addEventListener('ambiguo:onlineSaveError', event => {
+    console.warn('Errore salvataggio online Redis.', event.detail?.error);
+    if (typeof toast === 'function') toast('Salvataggio online non riuscito. Dati salvati solo localmente.');
+  });
+
   render();
 })();
