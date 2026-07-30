@@ -1522,3 +1522,186 @@
   cleanupEmptyOrderWines();
   render();
 })();
+
+
+/* === DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
+(function installDistributorOrdersCollapseFix(){
+  const expandedOrders = new Set();
+
+  function isDistributorOrdersPage() {
+    const title = document.querySelector("h1, .page-title, .view-title");
+    return title && title.textContent.trim().toLowerCase().includes("ordini distributori");
+  }
+
+  function svgChevronDown() {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 9l6 6 6-6"></path>
+      </svg>
+    `;
+  }
+
+  function getOrderKey(card, index) {
+    const text = card.textContent || "";
+    const code = text.match(/ORD[-–—]\s*\d+/i);
+    if (code) return code[0].replace(/\s+/g, "");
+    const title = card.querySelector("h2,h3,strong,b")?.textContent?.trim() || "";
+    const date = text.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || "";
+    return `${date}-${title}-${index}`;
+  }
+
+  function findOrderCards() {
+    if (!isDistributorOrdersPage()) return [];
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    const cards = [];
+
+    tables.forEach((table) => {
+      let el = table.parentElement;
+      let chosen = null;
+
+      while (el && el !== document.body) {
+        const text = el.textContent || "";
+        const hasOrderCode = /ORD[-–—]\s*\d+/i.test(text);
+        const hasDistributorActions =
+          text.includes("Modifica dati") ||
+          text.includes("Apri dettaglio") ||
+          text.includes("Duplica") ||
+          text.includes("Elimina");
+
+        if (hasOrderCode && hasDistributorActions) {
+          chosen = el;
+          break;
+        }
+
+        el = el.parentElement;
+      }
+
+      if (chosen && !cards.includes(chosen)) cards.push(chosen);
+    });
+
+    return cards;
+  }
+
+  function removeOldExpandButtons(card) {
+    const buttons = Array.from(card.querySelectorAll("button"));
+    buttons.forEach((btn) => {
+      const t = btn.textContent.trim().toLowerCase();
+      if (
+        t.includes("mostra tutte") ||
+        t.includes("raggruppa") ||
+        t === "↓" ||
+        t === "↑"
+      ) {
+        btn.dataset.oldExpand = "true";
+        btn.classList.add("dist-order-old-expand");
+        btn.style.display = "none";
+      }
+    });
+  }
+
+  function getInsertPoint(card) {
+    const table = card.querySelector("table");
+    if (table) return table;
+
+    const tableLike = card.querySelector(".order-lines,.order-table,.table-wrap,.responsive-table");
+    if (tableLike) return tableLike;
+
+    return null;
+  }
+
+  function enhanceOrderCards() {
+    if (!isDistributorOrdersPage()) return;
+
+    const cards = findOrderCards();
+
+    cards.forEach((card, index) => {
+      const key = getOrderKey(card, index);
+
+      card.classList.add("dist-order-card-fixed");
+      card.dataset.distOrderKey = key;
+
+      removeOldExpandButtons(card);
+
+      let row = card.querySelector(":scope > .dist-order-collapse-row");
+      if (!row) {
+        row = document.createElement("div");
+        row.className = "dist-order-collapse-row";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "dist-order-collapse-btn";
+        btn.innerHTML = svgChevronDown();
+        btn.setAttribute("aria-label", "Espandi ordine");
+        btn.title = "Espandi ordine";
+
+        btn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const isExpanded = card.classList.contains("is-expanded");
+
+          if (isExpanded) {
+            expandedOrders.delete(key);
+            card.classList.remove("is-expanded");
+            card.classList.add("is-collapsed");
+            btn.setAttribute("aria-label", "Espandi ordine");
+            btn.title = "Espandi ordine";
+          } else {
+            expandedOrders.add(key);
+            card.classList.add("is-expanded");
+            card.classList.remove("is-collapsed");
+            btn.setAttribute("aria-label", "Raggruppa ordine");
+            btn.title = "Raggruppa ordine";
+          }
+        });
+
+        row.appendChild(btn);
+
+        const insertPoint = getInsertPoint(card);
+        if (insertPoint && insertPoint.parentNode) {
+          insertPoint.parentNode.insertBefore(row, insertPoint.nextSibling);
+        } else {
+          card.appendChild(row);
+        }
+      }
+
+      if (expandedOrders.has(key)) {
+        card.classList.add("is-expanded");
+        card.classList.remove("is-collapsed");
+      } else {
+        card.classList.add("is-collapsed");
+        card.classList.remove("is-expanded");
+      }
+    });
+  }
+
+  const run = () => {
+    requestAnimationFrame(() => {
+      enhanceOrderCards();
+      setTimeout(enhanceOrderCards, 120);
+    });
+  };
+
+  document.addEventListener("click", () => setTimeout(run, 80), true);
+  document.addEventListener("input", () => setTimeout(run, 80), true);
+  document.addEventListener("change", () => setTimeout(run, 80), true);
+
+  const observer = new MutationObserver(() => {
+    clearTimeout(window.__distOrderCollapseTimer);
+    window.__distOrderCollapseTimer = setTimeout(run, 80);
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+/* === END DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
+

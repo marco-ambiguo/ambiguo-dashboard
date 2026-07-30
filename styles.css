@@ -1570,3 +1570,80 @@ button[data-sidebar-toggle] svg {
 
 /* === END DASHBOARD CHARTS FINAL CLEAN FIX === */
 
+
+/* === DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
+
+.dist-order-card-fixed {
+  position: relative;
+}
+
+.dist-order-card-fixed.is-collapsed table,
+.dist-order-card-fixed.is-collapsed .order-lines,
+.dist-order-card-fixed.is-collapsed .order-table,
+.dist-order-card-fixed.is-collapsed .table-wrap,
+.dist-order-card-fixed.is-collapsed .responsive-table {
+  display: none !important;
+}
+
+.dist-order-collapse-row {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 8px;
+}
+
+.dist-order-collapse-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 15, 15, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  color: #111;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background .18s ease, transform .18s ease, border-color .18s ease;
+}
+
+.dist-order-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(15, 15, 15, 0.22);
+  transform: translateY(-1px);
+}
+
+.dist-order-collapse-btn:active {
+  transform: translateY(0);
+}
+
+.dist-order-collapse-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 2.35;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dist-order-card-fixed.is-expanded .dist-order-collapse-btn svg {
+  transform: rotate(180deg);
+}
+
+.dist-order-card-fixed .dist-order-old-expand,
+.dist-order-card-fixed button.dist-order-old-expand {
+  display: none !important;
+}
+
+/* evita bottoni testuali tipo "Mostra tutte" */
+.dist-order-card-fixed button[data-old-expand="true"] {
+  display: none !important;
+}
+
+/* === END DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
+
