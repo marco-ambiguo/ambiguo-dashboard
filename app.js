@@ -91,7 +91,16 @@
     const resaleUnit=Number(line.resalePrice||0);
     return {listUnit,netUnit,discountUnit,vatUnit,grossUnit,resaleUnit,netTotal:netUnit*qty,discountTotal:discountUnit*qty,vatTotal:vatUnit*qty,grossTotal:grossUnit*qty,resaleTotal:resaleUnit*qty};
   }
-  function saleLineTotals(line){ const qty=intQty(line.quantity||0); const unit=parseAmount(line.unitPrice||0); const discount=parseAmount(line.discount||0); const total=Math.max(0,(unit*qty)-discount); const cost=Number(line.costTotal||0); return { theoretical:unit*qty, total, cost, margin:total-cost }; }
+  function saleLineTotals(line){
+    const qty=intQty(line.quantity||0);
+    const unit=parseAmount(line.unitPrice||0);
+    const discount=parseAmount(line.discount||0);
+    const total=Math.max(0,(unit*qty)-discount);
+    const w=line?.wineId ? getWine(line.wineId) : null;
+    const liveCost=w ? lineTotals(w).grossUnit*qty : 0;
+    const cost=Number(line.costTotal || liveCost || 0);
+    return { theoretical:unit*qty, total, cost, margin:total-cost };
+  }
   function wineStatus(w){ if(w.archived) return 'archiviato'; if(Number(w.quantity||0)<=0) return 'esaurito'; if(Number(w.quantity||0)<=Number(state.settings.lowStockThreshold||0)) return 'giacenza bassa'; return 'disponibile'; }
   function tagBadge(tag){ const t=String(tag||'').toLowerCase(); return `<span class="badge tag-badge tag-${esc(t)}">${esc(tag||'—')}</span>`; }
   function nextCode(prefix, arr){ return `${prefix}-${String((arr?.length||0)+1).padStart(3,'0')}`; }
@@ -850,7 +859,7 @@
       totals.theoretical+=t.theoretical;
       totals.discount+=parseAmount(l.discount||0);
       totals.total+=t.total;
-      totals.cost+=Number(l.costTotal||0);
+      totals.cost+=t.cost;
       totals.margin=totals.total-totals.cost;
       const el=document.getElementById(`sale_line_total_${i}`);
       const grossCostUnit = w ? lineTotals(w).grossUnit : 0;
@@ -858,7 +867,7 @@
       if(el) el.innerHTML=`<div class="summary-row"><span>Costo pagato / bottiglia</span><strong>${money(grossCostUnit)}</strong></div><div class="summary-row"><span>Costo selezionato</span><strong>${money(grossCostTotal)}</strong></div><div class="summary-row"><span>Resell base</span><strong>${money(w?.resalePrice||0)}</strong></div><div class="summary-row"><span>Prezzo applicato</span><strong>${money(l.unitPrice)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.total)}</strong></div>${l.manualPrice?`<div class="summary-row"><span>Nota</span><strong>Prezzo modificato manualmente</strong></div>`:''}`;
     });
     const root=document.getElementById('saleTotals');
-    if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(totals.quantity)}</strong></div><div class="summary-row"><span>Totale teorico</span><strong>${money(totals.theoretical)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(totals.discount)}</strong></div><div class="summary-row"><span>Totale cliente</span><strong>${money(totals.total)}</strong></div><div class="summary-row"><span>Costo storico</span><strong>${money(totals.cost)}</strong></div><div class="summary-row"><span>Margine</span><strong>${money(totals.margin)}</strong></div>`;
+    if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(totals.quantity)}</strong></div><div class="summary-row"><span>Totale teorico</span><strong>${money(totals.theoretical)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(totals.discount)}</strong></div><div class="summary-row"><span>Totale cliente</span><strong>${money(totals.total)}</strong></div><div class="summary-row"><span>Costo bottiglie</span><strong>${money(totals.cost)}</strong></div><div class="summary-row"><span>Margine</span><strong>${money(totals.margin)}</strong></div>`;
   }
 
   function saveSaleFromModal(existing, originalSnapshot){
