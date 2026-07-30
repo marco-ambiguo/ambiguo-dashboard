@@ -6,6 +6,7 @@
   let sortState = { key: 'name', dir: 'asc' };
   let orderSortState = { key: 'date', dir: 'desc' };
   let searchTerm = '';
+  let saleFilters = { status: '', payment: '', recipient: '', sort: 'date:desc' };
   const expandedOrders = new Set();
 
   const views = {
