@@ -1281,3 +1281,31 @@ h3,
   }
 }
 
+
+/* =========================================================
+   DASHBOARD KPI / CHART GAP FINAL FIX
+   Solo dashboard: aumenta lo spazio tra KPI e prima riga grafici.
+   ========================================================= */
+@media (min-width: 1181px) {
+  #view-dashboard.active {
+    gap: 24px !important;
+  }
+
+  #view-dashboard.active .grid.cards {
+    margin-bottom: 2px !important;
+  }
+
+  #view-dashboard.active .dashboard-charts-6 {
+    margin-top: 0 !important;
+  }
+}
+
+@media (min-width: 1181px) and (max-height: 860px) {
+  #view-dashboard.active {
+    gap: 18px !important;
+  }
+
+  #view-dashboard.active .grid.cards {
+    margin-bottom: 2px !important;
+  }
+}
