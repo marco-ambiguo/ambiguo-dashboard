@@ -357,8 +357,8 @@
         const delta=intQty(next.quantity)-intQty(before.quantity||0);
         Object.assign(before,next,{updatedAt:S.now()});
         if(delta!==0) addMovement(before.id,delta,'rettifica inventario',todayISO(),'Modifica quantità da scheda vino');
-        // Importante: modificare un vino dalla Cantina NON deve creare, spostare o duplicare ordini distributore.
-        // Gli ordini distributore restano storico dell'acquisto; dalla Cantina aggiorniamo solo la referenza e lo stock.
+        // Se il vino è già collegato a un ordine, aggiorniamo QUELLA riga, senza creare nuovi ordini o spostarlo.
+        updateLinkedOrderLineFromWine(before, previous);
       } else {
         next.createdAt=S.now();
         state.wines.push(next);
@@ -415,27 +415,166 @@
 
   function openOrderModal(id, duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.orders.find(o=>o.id===id):null; const order=old?JSON.parse(JSON.stringify(old)):null; const initialLines=order?.lines?.length?order.lines:[emptyOrderLine()]; openModal({title:isEdit?'Modifica ordine distributore':duplicate?'Duplica ordine distributore':'Nuovo ordine distributore',subtitle:'Inserisci prima la data. Non devi scegliere nessun numero ordine: viene creato un codice interno automatico.',body:`<div class="form-grid order-meta-grid">${field('Data ordine','orderDate',order?.date||todayISO(),'date')}<div class="field"><label>Distributore</label><div style="display:flex; gap:8px"><select id="f_orderDistributor">${activeDistributors().map(d=>`<option value="${d.id}" ${order?.distributorId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select><button class="btn secondary" id="addDistributorInOrder" type="button">+</button></div></div>${field('Sconto ordine proposto','orderDiscountPreset',order?.discountPreset||distributorDefaultDiscount(order?.distributorId||activeDistributors()[0]?.id)||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Cliente associato, opzionale</label><div style="display:flex; gap:8px"><select id="f_orderCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${order?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInOrder" type="button">+</button></div></div>${field('Stato','orderStatus',order?.status||'ricevuto','select',['bozza','ricevuto'])}${field('Pagamento','orderPaymentStatus',order?.paymentStatus||'da pagare','select',['da pagare','pagato'])}</div><div class="section-head"><h2>Referenze</h2><button class="btn secondary" id="addOrderLineBtn" type="button">Aggiungi riga</button></div><div id="orderLines"></div><div class="summary-box" id="orderTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_orderNotes">${esc(order?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine',onPrimary:()=>saveOrderFromModal(isEdit?old:null)}); window.__orderLines=initialLines.map(l=>({...emptyOrderLine(),...l})); if(!old){ const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset})); } renderOrderLines(); document.getElementById('addOrderLineBtn').addEventListener('click',()=>{ window.__orderLines.push(emptyOrderLine()); renderOrderLines(); }); document.getElementById('f_orderDistributor').addEventListener('change',()=>{ const preset=distributorDefaultDiscount(val('orderDistributor')); const discountField=document.getElementById('f_orderDiscountPreset'); if(discountField && !isEdit) discountField.value=preset||'none'; }); document.getElementById('f_orderDiscountPreset')?.addEventListener('change',()=>{ syncOrderLinesFromDom(); const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset,discount1:0,discount2:0,discount3:0})); renderOrderLines(); }); document.getElementById('addDistributorInOrder').addEventListener('click',()=>quickAddDistributor((id,name)=>{ const select=document.getElementById('f_orderDistributor'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; const df=document.getElementById('f_orderDiscountPreset'); if(df) df.value=distributorDefaultDiscount(id)||'none'; })); document.getElementById('addCustomerInOrder').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_orderCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
   function emptyOrderLine(){ return {code:'',name:'',producer:'',vintage:'',size:'0.75',tag:'bianco',netUnitPrice:0,discountPreset:val('orderDiscountPreset')||'none',discount1:0,discount2:0,discount3:0,resalePrice:0,quantity:1,vatRate:state.settings.vatRate}; }
-  function renderOrderLines(){ const root=document.getElementById('orderLines'); root.innerHTML=window.__orderLines.map((l,i)=>`<div class="order-line" data-index="${i}"><div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small ghost" data-line-action="duplicate" data-index="${i}">Duplica</button><button class="btn small secondary" data-line-action="remove" data-index="${i}">Elimina</button></div></div><div class="order-line-grid">${field('Codice',`l_${i}_code`,l.code,'text')}${field('Nome vino',`l_${i}_name`,l.name,'text')}${field('Cantina',`l_${i}_producer`,l.producer,'text')}${field('Annata',`l_${i}_vintage`,l.vintage,'text')}${field('Dimensione',`l_${i}_size`,l.size,'select',['0.75','1.5l','1l','magnum','altro'])}${field('Tag',`l_${i}_tag`,l.tag,'select',TAGS)}${field('Listino no IVA',`l_${i}_netUnitPrice`,l.netUnitPrice,'number')}${field('Sconto',`l_${i}_discountPreset`,l.discountPreset||'none','selectPairs',DISCOUNT_PRESETS)}${field('Manuale 1 %',`l_${i}_discount1`,l.discount1||0,'number')}${field('Manuale 2 %',`l_${i}_discount2`,l.discount2||0,'number')}${field('Manuale 3 %',`l_${i}_discount3`,l.discount3||0,'number')}${field('Resell Ambiguo',`l_${i}_resalePrice`,l.resalePrice||0,'number')}${field('Quantità',`l_${i}_quantity`,l.quantity,'number')}${field('IVA %',`l_${i}_vatRate`,l.vatRate,'number')}</div><div class="summary-box line-summary soft-summary" id="line_total_${i}"></div></div>`).join(''); root.querySelectorAll('[data-line-action]').forEach(btn=>btn.addEventListener('click',()=>{ syncOrderLinesFromDom(); const i=Number(btn.dataset.index); if(btn.dataset.lineAction==='remove'&&window.__orderLines.length>1) window.__orderLines.splice(i,1); if(btn.dataset.lineAction==='duplicate') window.__orderLines.splice(i+1,0,{...window.__orderLines[i]}); renderOrderLines(); })); root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ syncOrderLinesFromDom(); updateOrderTotals(); })); updateOrderTotals(); }
-  function syncOrderLinesFromDom(){ window.__orderLines=window.__orderLines.map((l,i)=>({code:val(`l_${i}_code`),name:val(`l_${i}_name`),producer:val(`l_${i}_producer`),vintage:val(`l_${i}_vintage`),size:val(`l_${i}_size`),tag:val(`l_${i}_tag`),netUnitPrice:parseAmount(val(`l_${i}_netUnitPrice`)),discountPreset:val(`l_${i}_discountPreset`)||'none',discount1:parseAmount(val(`l_${i}_discount1`)),discount2:parseAmount(val(`l_${i}_discount2`)),discount3:parseAmount(val(`l_${i}_discount3`)),resalePrice:parseAmount(val(`l_${i}_resalePrice`)),quantity:intQty(val(`l_${i}_quantity`)),vatRate:parseAmount(val(`l_${i}_vatRate`)||state.settings.vatRate)})); }
+  function renderOrderLines(){ const root=document.getElementById('orderLines'); root.innerHTML=window.__orderLines.map((l,i)=>`<div class="order-line" data-index="${i}"><div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small ghost" data-line-action="duplicate" data-index="${i}">Duplica</button><button class="btn small secondary" data-line-action="remove" data-index="${i}">Elimina</button></div></div><div class="order-line-grid">${field('Codice',`l_${i}_code`,l.code,'text')}${field('Nome vino',`l_${i}_name`,l.name,'text')}${field('Cantina',`l_${i}_producer`,l.producer,'text')}${field('Annata',`l_${i}_vintage`,l.vintage,'text')}${field('Dimensione',`l_${i}_size`,l.size,'select',['0.75','1.5l','1l','magnum','altro'])}${field('Tag',`l_${i}_tag`,l.tag,'select',TAGS)}${field('Listino no IVA',`l_${i}_netUnitPrice`,l.netUnitPrice,'number')}${field('Sconto',`l_${i}_discountPreset`,l.discountPreset||'none','selectPairs',DISCOUNT_PRESETS)}${field('Manuale 1 %',`l_${i}_discount1`,l.discount1||0,'number')}${field('Manuale 2 %',`l_${i}_discount2`,l.discount2||0,'number')}${field('Manuale 3 %',`l_${i}_discount3`,l.discount3||0,'number')}${field('Resell Ambiguo',`l_${i}_resalePrice`,l.resalePrice||0,'number')}${field('Quantità',`l_${i}_quantity`,l.quantity,'number')}${field('IVA %',`l_${i}_vatRate`,l.vatRate,'number')}</div><div class="summary-box line-summary soft-summary" id="line_total_${i}"></div></div>`).join(''); root.querySelectorAll('[data-line-action]').forEach(btn=>btn.addEventListener('click',()=>{ syncOrderLinesFromDom(); const i=Number(btn.dataset.index); if(btn.dataset.lineAction==='remove'&&window.__orderLines.length>1) window.__orderLines.splice(i,1); if(btn.dataset.lineAction==='duplicate'){ const copy={...window.__orderLines[i],id:S.uuid(),sourceWineId:'',sourceOrderLineId:S.uuid()}; window.__orderLines.splice(i+1,0,copy); } renderOrderLines(); })); root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ syncOrderLinesFromDom(); updateOrderTotals(); })); updateOrderTotals(); }
+  function syncOrderLinesFromDom(){ window.__orderLines=window.__orderLines.map((l,i)=>({id:l.id,sourceWineId:l.sourceWineId||'',sourceOrderLineId:l.sourceOrderLineId||l.id||'',manualStock:Boolean(l.manualStock),code:val(`l_${i}_code`),name:val(`l_${i}_name`),producer:val(`l_${i}_producer`),vintage:val(`l_${i}_vintage`),size:val(`l_${i}_size`),tag:val(`l_${i}_tag`),netUnitPrice:parseAmount(val(`l_${i}_netUnitPrice`)),discountPreset:val(`l_${i}_discountPreset`)||'none',discount1:parseAmount(val(`l_${i}_discount1`)),discount2:parseAmount(val(`l_${i}_discount2`)),discount3:parseAmount(val(`l_${i}_discount3`)),resalePrice:parseAmount(val(`l_${i}_resalePrice`)),quantity:intQty(val(`l_${i}_quantity`)),vatRate:parseAmount(val(`l_${i}_vatRate`)||state.settings.vatRate)})); }
   function updateOrderTotals(){ let quantity=0, listTotal=0, discountTotal=0, netTotal=0, vatTotal=0, grossTotal=0, resaleTotal=0; window.__orderLines.forEach((l,i)=>{ const t=lineTotals(l); quantity+=Number(l.quantity||0); listTotal+=t.listUnit*Number(l.quantity||0); discountTotal+=t.discountTotal; netTotal+=t.netTotal; vatTotal+=t.vatTotal; grossTotal+=t.grossTotal; resaleTotal+=t.resaleTotal; const el=document.getElementById(`line_total_${i}`); if(el) el.innerHTML=`<div class="summary-row"><span>Sconto</span><strong>${discountLabel(l)}</strong></div><div class="summary-row"><span>Netto scontato</span><strong>${money(t.netUnit)}</strong></div><div class="summary-row"><span>Con IVA / bottiglia</span><strong>${money(t.grossUnit)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.grossTotal)}</strong></div>`; }); const root=document.getElementById('orderTotals'); if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(quantity)}</strong></div><div class="summary-row"><span>Listino no IVA</span><strong>${money(listTotal)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(discountTotal)}</strong></div><div class="summary-row"><span>Totale no IVA</span><strong>${money(netTotal)}</strong></div><div class="summary-row"><span>IVA</span><strong>${money(vatTotal)}</strong></div><div class="summary-row"><span>Totale con IVA</span><strong>${money(grossTotal)}</strong></div><div class="summary-row"><span>Valore resell</span><strong>${money(resaleTotal)}</strong></div>`; }
-  function saveOrderFromModal(existing){ syncOrderLinesFromDom(); const lines=window.__orderLines.filter(l=>l.code||l.name||l.producer).map(l=>({...l,id:S.uuid()})); if(!lines.length) return toast('Aggiungi almeno una riga.'); for(const l of lines){ if(!l.code||!l.name||!l.producer) return toast('Ogni riga deve avere codice, nome vino e cantina.'); if(l.quantity<=0) return toast('La quantità deve essere maggiore di zero.'); if(l.netUnitPrice<0||Number.isNaN(l.netUnitPrice)) return toast('Prezzo non valido.'); if([l.discount1,l.discount2,l.discount3].some(d=>Number(d)<0||Number(d)>=100)) return toast('Gli sconti devono essere tra 0 e 99,99%.'); }
-    const totals=calculateOrderTotals(lines); if(existing&&existing.status==='ricevuto') reverseOrderStock(existing); const order={id:existing?.id||S.uuid(),code:existing?.code||nextCode('ORD',state.orders),distributorId:val('orderDistributor'),customerId:val('orderCustomer'),date:val('orderDate'),status:val('orderStatus'),paymentStatus:val('orderPaymentStatus'),discountPreset:val('orderDiscountPreset')||'none',notes:val('orderNotes'),lines,totals,createdAt:existing?.createdAt||S.now(),updatedAt:S.now(),demo:existing?.demo||false}; if(existing) Object.assign(existing,order); else state.orders.push(order); if(order.status==='ricevuto' && !order.manualStock) order.lines.forEach(l=>upsertWineFromOrderLine(l,order)); cleanupEmptyOrderWines(); save(); closeModal(); toast(existing?'Ordine aggiornato.':'Ordine salvato.'); render(); }
-  function calculateOrderTotals(lines){ return lines.reduce((acc,l)=>{ const t=lineTotals(l); acc.quantity+=Number(l.quantity); acc.listTotal+=t.listUnit*Number(l.quantity||0); acc.discountTotal+=t.discountTotal; acc.netTotal+=t.netTotal; acc.vatTotal+=t.vatTotal; acc.grossTotal+=t.grossTotal; acc.resaleTotal+=t.resaleTotal; return acc; },{quantity:0,listTotal:0,discountTotal:0,netTotal:0,vatTotal:0,grossTotal:0,resaleTotal:0}); }
-  function reverseOrderStock(order){ order.lines.forEach(l=>{ const wine=state.wines.find(w=>w.sourceOrderId===order.id&&norm(w.code)===norm(l.code)&&norm(w.name)===norm(l.name)&&norm(w.producer)===norm(l.producer)); if(wine){ wine.quantity=Number(wine.quantity||0)-Number(l.quantity||0); addMovement(wine.id,-Number(l.quantity||0),'rettifica modifica ordine',todayISO(),`Rimozione vecchia riga ordine ${order.code}`,'order',order.id); }}); }
-  function upsertWineFromOrderLine(l,order){ const existing=state.wines.find(w=>norm(w.code)===norm(l.code)&&norm(w.name)===norm(l.name)&&norm(w.producer)===norm(l.producer)&&String(w.vintage||'')===String(l.vintage||'')&&String(w.size||'')===String(l.size||'')&&w.distributorId===order.distributorId&&!w.archived); if(existing){ const oldQty=Number(existing.quantity||0); const newQty=oldQty+Number(l.quantity||0); existing.netUnitPrice=Number(l.netUnitPrice||0); existing.discountPreset=l.discountPreset||'none'; existing.discount1=Number(l.discount1||0); existing.discount2=Number(l.discount2||0); existing.discount3=Number(l.discount3||0); existing.resalePrice=Number(l.resalePrice||existing.resalePrice||0); existing.quantity=newQty; existing.vatRate=Number(l.vatRate||state.settings.vatRate); existing.lastOrderDate=order.date; existing.updatedAt=S.now(); addMovement(existing.id,Number(l.quantity),'acquisto',order.date,`Ordine ${order.code}`,'order',order.id); } else { const wine={id:S.uuid(),code:l.code,name:l.name,producer:l.producer,vintage:l.vintage,size:l.size,tag:l.tag,distributorId:order.distributorId,netUnitPrice:Number(l.netUnitPrice||0),discountPreset:l.discountPreset||'none',discount1:Number(l.discount1||0),discount2:Number(l.discount2||0),discount3:Number(l.discount3||0),resalePrice:Number(l.resalePrice||0),quantity:Number(l.quantity||0),vatRate:Number(l.vatRate||state.settings.vatRate),notes:'',archived:false,createdAt:S.now(),sourceOrderId:order.id,lastOrderDate:order.date,demo:order.demo||false}; state.wines.push(wine); addMovement(wine.id,Number(l.quantity),'acquisto',order.date,`Ordine ${order.code}`,'order',order.id); }}
-  function openOrderView(id){ const o=state.orders.find(x=>x.id===id); if(!o) return; openModal({title:`Ordine distributore ${o.code}`,subtitle:`${distributorName(o.distributorId)} · ${dateIT(o.date)}`,body:`<div class="card table-card" style="box-shadow:none;border-radius:18px"><div class="table-scroll"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Netto</th><th>Con IVA</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${o.lines.map(l=>{const t=lineTotals(l); return `<tr><td class="cell-title">${esc(l.code)}</td><td>${esc(l.name)}</td><td>${esc(l.producer)}</td><td>${esc(l.vintage)}</td><td>${tagBadge(l.tag)}</td><td>${number(l.quantity)}</td><td>${money(l.netUnitPrice)}</td><td>${discountLabel(l)}</td><td>${money(t.netUnit)}</td><td>${money(t.grossUnit)}</td><td>${money(l.resalePrice)}</td><td>${money(t.grossTotal)}</td></tr>`;}).join('')}</tbody></table></div></div><div class="summary-box" style="margin-top:16px"><div class="summary-row"><span>Bottiglie</span><strong>${number(o.totals.quantity)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(o.totals.discountTotal)}</strong></div><div class="summary-row"><span>Totale no IVA</span><strong>${money(o.totals.netTotal)}</strong></div><div class="summary-row"><span>IVA</span><strong>${money(o.totals.vatTotal)}</strong></div><div class="summary-row"><span>Totale con IVA</span><strong>${money(o.totals.grossTotal)}</strong></div><div class="summary-row"><span>Valore resell</span><strong>${money(o.totals.resaleTotal)}</strong></div></div>${o.notes?`<p class="small-muted">${esc(o.notes)}</p>`:''}`,primary:'Modifica ordine',onPrimary:()=>openOrderModal(id)}); }
+  function saveOrderFromModal(existing){
+    syncOrderLinesFromDom();
+    const previousOrder = existing ? JSON.parse(JSON.stringify(existing)) : null;
+    const oldLines = previousOrder?.lines || [];
+    const lines=window.__orderLines
+      .filter(l=>l.code||l.name||l.producer)
+      .map(l=>({...l,id:l.id||S.uuid(),sourceOrderLineId:l.sourceOrderLineId||l.id||S.uuid()}));
 
-  function openSaleModal(id,duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.sales.find(s=>s.id===id):null; const sale=old?JSON.parse(JSON.stringify(old)):null; const lines=sale?.lines?.length?sale.lines:[emptySaleLine()]; openModal({title:isEdit?'Modifica ordine cliente':duplicate?'Duplica ordine cliente':'Nuovo ordine cliente',subtitle:'Seleziona o aggiungi cliente, poi scegli i vini dalla cantina.',body:`<div class="form-grid order-meta-grid">${field('Data','saleDate',sale?.date||todayISO(),'date')}<div class="field"><label>Cliente</label><div style="display:flex;gap:8px"><select id="f_saleCustomer"><option value="">Seleziona cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${sale?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInSale" type="button">+</button></div></div>${field('Stato','saleStatus',sale?.status||'confermato','select',SALE_STATUSES)}${field('Metodo pagamento','salePaymentMethod',sale?.paymentMethod||'cash','select',PAYMENT_METHODS)}${field('Mandati a','salePaymentRecipient',sale?.paymentRecipient||'Marco','select',PAYMENT_RECIPIENTS)}</div><div class="section-head"><h2>Vini</h2><button class="btn secondary" id="addSaleLineBtn" type="button">Aggiungi riga</button></div><div id="saleLines"></div><div class="summary-box" id="saleTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_saleNotes">${esc(sale?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine cliente',onPrimary:()=>saveSaleFromModal(isEdit?old:null)}); window.__saleLines=lines.map(l=>({...emptySaleLine(),...l})); renderSaleLines(); document.getElementById('addSaleLineBtn').addEventListener('click',()=>{ window.__saleLines.push(emptySaleLine()); renderSaleLines(); }); document.getElementById('addCustomerInSale').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_saleCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
-  function emptySaleLine(){ return {wineId:'',quantity:1,unitPrice:0,discount:0,costTotal:0,allocations:[]}; }
-  function renderSaleLines(){ const root=document.getElementById('saleLines'); const options=state.wines.filter(w=>!w.archived).map(w=>[w.id,`${w.code} — ${w.name} / ${w.producer} (${w.quantity} disp.)`]); root.innerHTML=window.__saleLines.map((l,i)=>`<div class="order-line"><div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small secondary" data-sale-line-action="remove" data-index="${i}">Elimina</button></div></div><div class="sale-line-grid">${field('Vino',`s_${i}_wineId`,l.wineId,'selectPairs', [['','Seleziona vino'],...options])}${field('Quantità',`s_${i}_quantity`,l.quantity,'number')}${field('Prezzo vendita','s_'+i+'_unitPrice',l.unitPrice,'number')}${field('Sconto €','s_'+i+'_discount',l.discount,'number')}<div class="summary-box line-summary soft-summary" id="sale_line_total_${i}"></div></div></div>`).join(''); root.querySelectorAll('[data-sale-line-action]').forEach(btn=>btn.addEventListener('click',()=>{ syncSaleLinesFromDom(); const i=Number(btn.dataset.index); if(window.__saleLines.length>1) window.__saleLines.splice(i,1); renderSaleLines(); })); root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ const m=el.id.match(/^f_s_(\d+)_wineId$/); if(m){ const i=Number(m[1]); const w=getWine(el.value); if(w) document.getElementById(`f_s_${i}_unitPrice`).value=moneyInputValue(w.resalePrice||0); } syncSaleLinesFromDom(); updateSaleTotals(); })); updateSaleTotals(); }
-  function syncSaleLinesFromDom(){ window.__saleLines=window.__saleLines.map((l,i)=>({wineId:val(`s_${i}_wineId`),quantity:intQty(val(`s_${i}_quantity`)),unitPrice:parseAmount(val(`s_${i}_unitPrice`)),discount:parseAmount(val(`s_${i}_discount`)),costTotal:Number(l.costTotal||0),allocations:l.allocations||[]})); }
-  function updateSaleTotals(){ let quantity=0,theoretical=0,total=0,cost=0,margin=0; window.__saleLines.forEach((l,i)=>{ const t=saleLineTotals(l); quantity+=Number(l.quantity||0); theoretical+=t.theoretical; total+=t.total; cost+=t.cost; margin+=t.margin; const w=getWine(l.wineId); const el=document.getElementById(`sale_line_total_${i}`); if(el) el.innerHTML=`<div class="summary-row"><span>Disponibili</span><strong>${number(w?.quantity||0)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.total)}</strong></div><div class="summary-row"><span>Costo storico</span><strong>${money(t.cost)}</strong></div>`; }); const root=document.getElementById('saleTotals'); if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(quantity)}</strong></div><div class="summary-row"><span>Totale teorico</span><strong>${money(theoretical)}</strong></div><div class="summary-row"><span>Totale finale</span><strong>${money(total)}</strong></div><div class="summary-row"><span>Margine stimato</span><strong>${money(margin)}</strong></div>`; }
-  function saveSaleFromModal(existing){ syncSaleLinesFromDom(); const customerId=val('saleCustomer'); if(!customerId) return toast('Seleziona o crea un cliente.'); const lines=window.__saleLines.filter(l=>l.wineId).map(l=>({...l,id:S.uuid()})); if(!lines.length) return toast('Aggiungi almeno un vino.'); if(existing&&existing.status!=='annullato') reverseSaleStock(existing); for(const l of lines){ const w=getWine(l.wineId); if(!w) return toast('Vino non valido.'); if(l.quantity<=0) return toast('Quantità non valida.'); if(!state.settings.allowNegativeStock&&Number(w.quantity||0)<Number(l.quantity||0)){ if(!confirm(`Stock insufficiente per ${w.name}. Vuoi continuare?`)){ if(existing&&existing.status!=='annullato') applySaleStock(existing); return; } } const cost=allocateStockSimple(w,Number(l.quantity),val('saleDate')); l.costTotal=cost; }
-    const totals=calculateSaleTotals(lines); const sale={id:existing?.id||S.uuid(),code:existing?.code||nextCode('CLI',state.sales),customerId,date:val('saleDate'),status:val('saleStatus'),paymentMethod:val('salePaymentMethod'),paymentRecipient:val('salePaymentRecipient'),notes:val('saleNotes'),lines,totals,createdAt:existing?.createdAt||S.now(),updatedAt:S.now(),demo:existing?.demo||false}; if(existing) Object.assign(existing,sale); else state.sales.push(sale); save(); closeModal(); toast(existing?'Ordine cliente aggiornato.':'Ordine cliente salvato.'); render(); }
-  function calculateSaleTotals(lines){ return lines.reduce((a,l)=>{ const t=saleLineTotals(l); a.quantity+=Number(l.quantity||0); a.theoretical+=t.theoretical; a.total+=t.total; a.cost+=t.cost; a.margin+=t.margin; return a; },{quantity:0,theoretical:0,total:0,cost:0,margin:0}); }
-  function allocateStockSimple(w,qty,date){ const take=Math.min(Number(w.quantity||0),qty); const cost=lineTotals(w).netUnit*qty; w.quantity=Number(w.quantity||0)-qty; addMovement(w.id,-qty,'vendita',date,`Ordine cliente`,'sale',''); return cost; }
-  function reverseSaleStock(sale){ sale.lines.forEach(l=>{ const w=getWine(l.wineId); if(w){ w.quantity=Number(w.quantity||0)+Number(l.quantity||0); addMovement(w.id,Number(l.quantity||0),'rettifica annullamento vendita',todayISO(),`Modifica ordine cliente ${sale.code}`,'sale',sale.id); }}); }
-  function applySaleStock(sale){ sale.lines.forEach(l=>{ const w=getWine(l.wineId); if(w){ w.quantity=Number(w.quantity||0)-Number(l.quantity||0); addMovement(w.id,-Number(l.quantity||0),'vendita',sale.date,`Ordine cliente ${sale.code}`,'sale',sale.id); }}); }
+    if(!lines.length) return toast('Aggiungi almeno una riga.');
+    for(const l of lines){
+      if(!l.code||!l.name||!l.producer) return toast('Ogni riga deve avere codice, nome vino e cantina.');
+      if(l.quantity<=0) return toast('La quantità deve essere maggiore di zero.');
+      if(l.netUnitPrice<0||Number.isNaN(l.netUnitPrice)) return toast('Prezzo non valido.');
+      if([l.discount1,l.discount2,l.discount3].some(d=>Number(d)<0||Number(d)>=100)) return toast('Gli sconti devono essere tra 0 e 99,99%.');
+    }
+
+    const order={id:existing?.id||S.uuid(),code:existing?.code||nextCode('ORD',state.orders),distributorId:val('orderDistributor'),customerId:val('orderCustomer'),date:val('orderDate'),status:val('orderStatus'),paymentStatus:val('orderPaymentStatus'),discountPreset:val('orderDiscountPreset')||'none',notes:val('orderNotes'),lines,totals:calculateOrderTotals(lines),createdAt:existing?.createdAt||S.now(),updatedAt:S.now(),demo:existing?.demo||false,manualStock:Boolean(existing?.manualStock)};
+
+    if(existing) Object.assign(existing,order); else state.orders.push(order);
+
+    if(order.status==='ricevuto'){
+      reconcileOrderWithCellar(order, oldLines, previousOrder?.status);
+    }
+
+    cleanupEmptyOrderWines();
+    save(); closeModal(); toast(existing?'Ordine aggiornato.':'Ordine salvato.'); render();
+  }
+
+  function orderLineKey(l){ return l?.sourceWineId || l?.id || l?.sourceOrderLineId || ''; }
+  function findWineForOrderLine(l, order){
+    if(l.sourceWineId){ const byId=getWine(l.sourceWineId); if(byId) return byId; }
+    const byLine=state.wines.find(w=>w.sourceOrderId===order.id && w.sourceOrderLineId && w.sourceOrderLineId===(l.sourceOrderLineId||l.id));
+    if(byLine) return byLine;
+    return state.wines.find(w=>w.sourceOrderId===order.id && norm(w.code)===norm(l.code) && norm(w.name)===norm(l.name) && norm(w.producer)===norm(l.producer) && String(w.vintage||'')===String(l.vintage||'') && String(w.size||'')===String(l.size||''));
+  }
+
+  function applyOrderFieldsToWine(w,l,order){
+    Object.assign(w,{code:l.code,name:l.name,producer:l.producer,vintage:l.vintage,size:l.size,tag:l.tag,distributorId:order.distributorId,netUnitPrice:Number(l.netUnitPrice||0),discountPreset:l.discountPreset||'none',discount1:Number(l.discount1||0),discount2:Number(l.discount2||0),discount3:Number(l.discount3||0),resalePrice:Number(l.resalePrice||0),vatRate:Number(l.vatRate||state.settings.vatRate),sourceOrderId:order.id,sourceOrderLineId:l.sourceOrderLineId||l.id,lastOrderDate:order.date,updatedAt:S.now(),demo:order.demo||w.demo||false});
+    l.sourceWineId=w.id;
+    l.sourceOrderLineId=w.sourceOrderLineId;
+  }
+
+  function reconcileOrderWithCellar(order, oldLines=[], previousStatus){
+    const oldByKey=new Map(oldLines.map(l=>[orderLineKey(l), l]));
+    const newKeys=new Set(order.lines.map(orderLineKey));
+
+    // Righe tolte dall'ordine: scarica solo la quantità vecchia dalla cantina collegata.
+    oldLines.forEach(old=>{
+      const key=orderLineKey(old);
+      if(!key || newKeys.has(key)) return;
+      const w=findWineForOrderLine(old, order);
+      if(w){
+        w.quantity=intQty(w.quantity)-intQty(old.quantity);
+        addMovement(w.id,-intQty(old.quantity),'rettifica modifica ordine',todayISO(),`Riga rimossa da ${order.code}`,'order',order.id);
+      }
+    });
+
+    order.lines.forEach(l=>{
+      const key=orderLineKey(l);
+      const previousLine=oldByKey.get(key) || null;
+      let w=findWineForOrderLine(l, order);
+      if(!w){
+        w={id:S.uuid(),notes:'',archived:false,createdAt:S.now(),quantity:0};
+        state.wines.push(w);
+      }
+
+      const previousQty = previousStatus==='ricevuto' && previousLine ? intQty(previousLine.quantity) : 0;
+      const delta = intQty(l.quantity) - previousQty;
+      applyOrderFieldsToWine(w,l,order);
+      if(delta!==0){
+        w.quantity=intQty(w.quantity)+delta;
+        addMovement(w.id,delta,delta>0?'acquisto':'rettifica modifica ordine',order.date||todayISO(),`Ordine ${order.code}`,'order',order.id);
+      }
+    });
+
+    order.totals=calculateOrderTotals(order.lines||[]);
+  }
+
+  function reverseOrderStock(order){
+    order.lines.forEach(l=>{
+      const wine=findWineForOrderLine(l, order);
+      if(wine){
+        wine.quantity=intQty(wine.quantity)-intQty(l.quantity);
+        addMovement(wine.id,-intQty(l.quantity),'rettifica eliminazione ordine',todayISO(),`Eliminazione ordine ${order.code}`,'order',order.id);
+      }
+    });
+  }
+
+  function upsertWineFromOrderLine(l,order){
+    const line={...l,id:l.id||S.uuid(),sourceOrderLineId:l.sourceOrderLineId||l.id||S.uuid()};
+    const previous=[];
+    reconcileOrderWithCellar({...order,lines:[line]}, previous, 'bozza');
+  }
+
+  function updateLinkedOrderLineFromWine(w, previous){
+    if(!w || !w.sourceOrderId) return;
+    const order=state.orders.find(o=>o.id===w.sourceOrderId);
+    if(!order) return;
+    let line=(order.lines||[]).find(l=>l.sourceWineId===w.id || (w.sourceOrderLineId && (l.sourceOrderLineId===w.sourceOrderLineId || l.id===w.sourceOrderLineId)));
+    if(!line){
+      line=(order.lines||[]).find(l=>norm(l.code)===norm(previous?.code||w.code) && norm(l.name)===norm(previous?.name||w.name) && norm(l.producer)===norm(previous?.producer||w.producer) && String(l.vintage||'')===String(previous?.vintage||w.vintage||'') && String(l.size||'')===String(previous?.size||w.size||''));
+    }
+    if(!line) return;
+    line.sourceWineId=w.id;
+    line.sourceOrderLineId=w.sourceOrderLineId||line.sourceOrderLineId||line.id;
+    Object.assign(line,{code:w.code,name:w.name,producer:w.producer,vintage:w.vintage,size:w.size,tag:w.tag,netUnitPrice:Number(w.netUnitPrice||0),discountPreset:w.discountPreset||'none',discount1:Number(w.discount1||0),discount2:Number(w.discount2||0),discount3:Number(w.discount3||0),resalePrice:Number(w.resalePrice||0),vatRate:Number(w.vatRate||state.settings.vatRate)});
+    // Solo i vini inseriti manualmente dalla Cantina sincronizzano anche la quantità con l'ordine automatico.
+    if(w.manualStock || order.manualStock){ line.quantity=intQty(w.quantity); }
+    order.distributorId=w.distributorId||order.distributorId;
+    if(w.lastOrderDate) order.date=w.lastOrderDate;
+    order.totals=calculateOrderTotals(order.lines||[]);
+    order.updatedAt=S.now();
+  }
+
+  function calculateOrderTotals(lines){ return lines.reduce((acc,l)=>{ const t=lineTotals(l); acc.quantity+=Number(l.quantity); acc.listTotal+=t.listUnit*Number(l.quantity||0); acc.discountTotal+=t.discountTotal; acc.netTotal+=t.netTotal; acc.vatTotal+=t.vatTotal; acc.grossTotal+=t.grossTotal; acc.resaleTotal+=t.resaleTotal; return acc; },{quantity:0,listTotal:0,discountTotal:0,netTotal:0,vatTotal:0,grossTotal:0,resaleTotal:0}); }
+  function lineIdentity(l){ return [norm(l.code),norm(l.name),norm(l.producer),String(l.vintage||''),String(l.size||'')].join('|'); }
+
+  function wineToOrderLine(w){
+    const id=w.sourceOrderLineId||S.uuid();
+    return {id,sourceOrderLineId:id,sourceWineId:w.id,manualStock:true,code:w.code,name:w.name,producer:w.producer,vintage:w.vintage,size:w.size,tag:w.tag,netUnitPrice:parseAmount(w.netUnitPrice),discountPreset:w.discountPreset||'none',discount1:parseAmount(w.discount1),discount2:parseAmount(w.discount2),discount3:parseAmount(w.discount3),resalePrice:parseAmount(w.resalePrice),quantity:intQty(w.quantity),vatRate:parseAmount(w.vatRate||state.settings.vatRate)};
+  }
+  function syncManualWineOrder(w, previous){
+    if(!w || !w.distributorId || !w.lastOrderDate) return;
+    if(previous && previous.sourceOrderId){
+      const oldOrder=state.orders.find(o=>o.id===previous.sourceOrderId);
+      const sameOrder = oldOrder && oldOrder.distributorId===w.distributorId && String(oldOrder.date||'')===String(w.lastOrderDate||'');
+      if(sameOrder){
+        w.sourceOrderId=oldOrder.id;
+        w.sourceOrderLineId=previous.sourceOrderLineId;
+        updateLinkedOrderLineFromWine(w, previous);
+        return;
+      }
+      if(oldOrder){
+        oldOrder.lines=(oldOrder.lines||[]).filter(l=>l.sourceWineId!==w.id);
+        oldOrder.totals=calculateOrderTotals(oldOrder.lines||[]);
+      }
+    }
+    let order=state.orders.find(o=>o.manualStock && o.distributorId===w.distributorId && String(o.date||'')===String(w.lastOrderDate||''));
+    if(!order){
+      order={id:S.uuid(),code:nextCode('ORD',state.orders),distributorId:w.distributorId,customerId:'',date:w.lastOrderDate,status:'ricevuto',paymentStatus:'da pagare',discountPreset:w.discountPreset||distributorDefaultDiscount(w.distributorId)||'none',notes:'Creato automaticamente da inserimento manuale in cantina.',manualStock:true,lines:[],createdAt:S.now()};
+      state.orders.push(order);
+    }
+    const line=wineToOrderLine(w);
+    const idx=order.lines.findIndex(l=>l.sourceWineId===w.id || l.sourceOrderLineId===w.sourceOrderLineId);
+    if(idx>=0) order.lines[idx]=line; else order.lines.push(line);
+    w.sourceOrderId=order.id;
+    w.sourceOrderLineId=line.sourceOrderLineId;
+    w.manualStock=true;
+    order.totals=calculateOrderTotals(order.lines||[]);
+    order.updatedAt=S.now();
+  }
+  function cleanupEmptyOrderWines(){
+    const protectedIds=new Set();
+    state.sales.forEach(s=>(s.lines||[]).forEach(l=>protectedIds.add(l.wineId)));
+    state.orders.forEach(o=>{ (o.lines||[]).forEach(l=>{ if(l.sourceWineId) protectedIds.add(l.sourceWineId); }); o.totals=calculateOrderTotals(o.lines||[]); });
+    state.wines=state.wines.filter(w=> intQty(w.quantity)>0 || protectedIds.has(w.id) || !w.sourceOrderId);
+  }
 
   function quickAddDistributor(callback){ const name=prompt('Nome nuovo distributore'); if(!name) return; const d={id:S.uuid(),name:name.trim(),discountPreset:'none',archived:false,notes:'',createdAt:S.now()}; state.distributors.push(d); save(); toast('Distributore aggiunto.'); callback?.(d.id,d.name); }
   function quickAddCustomer(callback){ const name=prompt('Nome nuovo cliente'); if(!name) return; const c={id:S.uuid(),name:name.trim(),type:'privato',email:'',phone:'',notes:'',archived:false,createdAt:S.now()}; state.customers.push(c); save(); toast('Cliente aggiunto.'); callback?.(c.id,c.name); }
