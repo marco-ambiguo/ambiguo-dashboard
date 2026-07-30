@@ -1169,7 +1169,7 @@ h3,
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 28px;
   }
 
   #view-dashboard.active .grid.cards {
@@ -1282,30 +1282,22 @@ h3,
 }
 
 
-/* =========================================================
-   DASHBOARD KPI / CHART GAP FINAL FIX
-   Solo dashboard: aumenta lo spazio tra KPI e prima riga grafici.
-   ========================================================= */
+
+/* === FINAL DASHBOARD KPI/CHART GAP ONLY === */
 @media (min-width: 1181px) {
   #view-dashboard.active {
-    gap: 24px !important;
+    gap: 28px !important;
   }
-
   #view-dashboard.active .grid.cards {
-    margin-bottom: 2px !important;
+    margin-bottom: 0 !important;
   }
-
   #view-dashboard.active .dashboard-charts-6 {
     margin-top: 0 !important;
   }
 }
-
 @media (min-width: 1181px) and (max-height: 860px) {
   #view-dashboard.active {
-    gap: 18px !important;
-  }
-
-  #view-dashboard.active .grid.cards {
-    margin-bottom: 2px !important;
+    gap: 22px !important;
   }
 }
+/* === END FINAL DASHBOARD KPI/CHART GAP ONLY === */
