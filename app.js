@@ -18,7 +18,7 @@
     impostazioni: document.getElementById('view-impostazioni')
   };
   const titles = { dashboard:'Dashboard', cantina:'Cantina', ordini:'Ordini distributori', vendite:'Ordini clienti', clienti:'Clienti', distributori:'Distributori', impostazioni:'Impostazioni' };
-  const TAGS = ['bianco', 'rosso', 'orange', 'rosato', 'bolla'];
+  const TAGS = ['bianco', 'rosso', 'orange', 'rosato', 'bolla', 'champagne'];
   const CUSTOMER_TYPES = ['privato','ristorante','enoteca','azienda','evento','uso interno','altro'];
   const SALE_STATUSES = ['bozza','confermato','pagato','annullato'];
   const PAYMENT_METHODS = ['cash','paypal','bonifico','revolut'];
@@ -383,29 +383,35 @@
   function updateWineTotals(){ const l={netUnitPrice:parseAmount(val('netUnitPrice')),discountPreset:val('discountPreset'),discount1:parseAmount(val('discount1')),discount2:parseAmount(val('discount2')),discount3:parseAmount(val('discount3')),resalePrice:parseAmount(val('resalePrice')),quantity:intQty(val('quantity')),vatRate:parseAmount(val('vatRate')||state.settings.vatRate)}; const t=lineTotals(l); const el=document.getElementById('wineLiveTotals'); if(el) el.innerHTML=`<div class="summary-row"><span>Sconto applicato</span><strong>${discountLabel(l)}</strong></div><div class="summary-row"><span>Costo netto scontato</span><strong>${money(t.netUnit)}</strong></div><div class="summary-row"><span>IVA per bottiglia</span><strong>${money(t.vatUnit)}</strong></div><div class="summary-row"><span>Costo con IVA / bottiglia</span><strong>${money(t.grossUnit)}</strong></div><div class="summary-row"><span>Totale costo con IVA</span><strong>${money(t.grossTotal)}</strong></div><div class="summary-row"><span>Totale resell</span><strong>${money(t.resaleTotal)}</strong></div>`; }
 
   function wineToOrderLine(w){
-    return {id:S.uuid(),sourceWineId:w.id,code:w.code,name:w.name,producer:w.producer,vintage:w.vintage,size:w.size,tag:w.tag,netUnitPrice:parseAmount(w.netUnitPrice),discountPreset:w.discountPreset||'none',discount1:parseAmount(w.discount1),discount2:parseAmount(w.discount2),discount3:parseAmount(w.discount3),resalePrice:parseAmount(w.resalePrice),quantity:intQty(w.quantity),vatRate:parseAmount(w.vatRate||state.settings.vatRate)};
+    const id=w.sourceOrderLineId||S.uuid();
+    return {id,sourceOrderLineId:id,sourceWineId:w.id,manualStock:true,code:w.code,name:w.name,producer:w.producer,vintage:w.vintage,size:w.size,tag:w.tag,netUnitPrice:parseAmount(w.netUnitPrice),discountPreset:w.discountPreset||'none',discount1:parseAmount(w.discount1),discount2:parseAmount(w.discount2),discount3:parseAmount(w.discount3),resalePrice:parseAmount(w.resalePrice),quantity:intQty(w.quantity),vatRate:parseAmount(w.vatRate||state.settings.vatRate)};
   }
   function syncManualWineOrder(w, previous){
     if(!w || !w.distributorId || !w.lastOrderDate) return;
-    if(previous){
-      state.orders.forEach(o=>{
-        const before=o.lines.length;
-        o.lines=(o.lines||[]).filter(l=>l.sourceWineId!==w.id);
-        if(o.lines.length!==before) o.totals=calculateOrderTotals(o.lines);
-      });
-      state.orders=state.orders.filter(o=>!(o.manualStock && (!o.lines || !o.lines.length)));
+
+    // Se il vino era già collegato a un ordine, NON creare/spostare ordini:
+    // aggiorna solo la riga già collegata.
+    if(previous && previous.sourceOrderId){
+      w.sourceOrderId=previous.sourceOrderId;
+      w.sourceOrderLineId=previous.sourceOrderLineId;
+      w.manualStock=Boolean(previous.manualStock);
+      updateLinkedOrderLineFromWine(w, previous);
+      return;
     }
+
+    // Solo un vino nuovo inserito manualmente in Cantina genera/aggiorna ordine automatico.
     let order=state.orders.find(o=>o.manualStock && o.distributorId===w.distributorId && String(o.date||'')===String(w.lastOrderDate||''));
     if(!order){
       order={id:S.uuid(),code:nextCode('ORD',state.orders),distributorId:w.distributorId,customerId:'',date:w.lastOrderDate,status:'ricevuto',paymentStatus:'da pagare',discountPreset:w.discountPreset||distributorDefaultDiscount(w.distributorId)||'none',notes:'Creato automaticamente da inserimento manuale in cantina.',manualStock:true,lines:[],createdAt:S.now()};
       state.orders.push(order);
     }
     const line=wineToOrderLine(w);
-    const idx=order.lines.findIndex(l=>l.sourceWineId===w.id);
+    const idx=order.lines.findIndex(l=>l.sourceWineId===w.id || l.sourceOrderLineId===w.sourceOrderLineId);
     if(idx>=0) order.lines[idx]=line; else order.lines.push(line);
-    w.sourceOrderId = order.id;
-    w.manualStock = true;
-    order.totals=calculateOrderTotals(order.lines);
+    w.sourceOrderId=order.id;
+    w.sourceOrderLineId=line.sourceOrderLineId;
+    w.manualStock=true;
+    order.totals=calculateOrderTotals(order.lines||[]);
     order.updatedAt=S.now();
   }
   function cleanupEmptyOrderWines(){
@@ -429,7 +435,7 @@
     const oldLines = previousOrder?.lines || [];
     const lines=window.__orderLines
       .filter(l=>l.code||l.name||l.producer)
-      .map(l=>({...l,id:l.id||S.uuid(),sourceOrderLineId:l.sourceOrderLineId||l.id||S.uuid()}));
+      .map(l=>{ const lineId=l.sourceOrderLineId||l.id||S.uuid(); return {...l,id:l.id||lineId,sourceOrderLineId:lineId,sourceWineId:l.sourceWineId||''}; });
 
     if(!lines.length) return toast('Aggiungi almeno una riga.');
     for(const l of lines){
@@ -484,6 +490,10 @@
       const key=orderLineKey(l);
       const previousLine=oldByKey.get(key) || null;
       let w=findWineForOrderLine(l, order);
+      // Se la riga è stata modificata nei campi chiave (codice/nome/cantina/annata),
+      // la ricerca con i nuovi valori può non trovare il vino vecchio. In quel caso
+      // usiamo la riga precedente per recuperare il vino già collegato e mantenerlo coerente.
+      if(!w && previousLine) w=findWineForOrderLine(previousLine, order);
       if(!w){
         w={id:S.uuid(),notes:'',archived:false,createdAt:S.now(),quantity:0};
         state.wines.push(w);
@@ -521,18 +531,49 @@
     if(!w || !w.sourceOrderId) return;
     const order=state.orders.find(o=>o.id===w.sourceOrderId);
     if(!order) return;
-    let line=(order.lines||[]).find(l=>l.sourceWineId===w.id || (w.sourceOrderLineId && (l.sourceOrderLineId===w.sourceOrderLineId || l.id===w.sourceOrderLineId)));
+
+    let line=(order.lines||[]).find(l=>
+      l.sourceWineId===w.id ||
+      (w.sourceOrderLineId && (l.sourceOrderLineId===w.sourceOrderLineId || l.id===w.sourceOrderLineId))
+    );
+
+    // Fallback per dati vecchi dove mancavano sourceWineId/sourceOrderLineId.
     if(!line){
-      line=(order.lines||[]).find(l=>norm(l.code)===norm(previous?.code||w.code) && norm(l.name)===norm(previous?.name||w.name) && norm(l.producer)===norm(previous?.producer||w.producer) && String(l.vintage||'')===String(previous?.vintage||w.vintage||'') && String(l.size||'')===String(previous?.size||w.size||''));
+      line=(order.lines||[]).find(l=>
+        norm(l.code)===norm(previous?.code||w.code) &&
+        norm(l.name)===norm(previous?.name||w.name) &&
+        norm(l.producer)===norm(previous?.producer||w.producer) &&
+        String(l.vintage||'')===String(previous?.vintage||w.vintage||'') &&
+        String(l.size||'')===String(previous?.size||w.size||'')
+      );
     }
     if(!line) return;
+
+    // Manteniamo collegamento stabile tra Cantina e riga ordine.
     line.sourceWineId=w.id;
-    line.sourceOrderLineId=w.sourceOrderLineId||line.sourceOrderLineId||line.id;
-    Object.assign(line,{code:w.code,name:w.name,producer:w.producer,vintage:w.vintage,size:w.size,tag:w.tag,netUnitPrice:Number(w.netUnitPrice||0),discountPreset:w.discountPreset||'none',discount1:Number(w.discount1||0),discount2:Number(w.discount2||0),discount3:Number(w.discount3||0),resalePrice:Number(w.resalePrice||0),vatRate:Number(w.vatRate||state.settings.vatRate)});
-    // Solo i vini inseriti manualmente dalla Cantina sincronizzano anche la quantità con l'ordine automatico.
-    if(w.manualStock || order.manualStock){ line.quantity=intQty(w.quantity); }
-    order.distributorId=w.distributorId||order.distributorId;
-    if(w.lastOrderDate) order.date=w.lastOrderDate;
+    line.sourceOrderLineId=w.sourceOrderLineId||line.sourceOrderLineId||line.id||S.uuid();
+    w.sourceOrderLineId=line.sourceOrderLineId;
+
+    // Qualsiasi modifica effettuata in Cantina viene riflessa sulla riga ordine collegata.
+    Object.assign(line,{
+      code:w.code,
+      name:w.name,
+      producer:w.producer,
+      vintage:w.vintage,
+      size:w.size,
+      tag:w.tag,
+      netUnitPrice:Number(w.netUnitPrice||0),
+      discountPreset:w.discountPreset||'none',
+      discount1:Number(w.discount1||0),
+      discount2:Number(w.discount2||0),
+      discount3:Number(w.discount3||0),
+      resalePrice:Number(w.resalePrice||0),
+      quantity:intQty(w.quantity),
+      vatRate:Number(w.vatRate||state.settings.vatRate)
+    });
+
+    // Importante: non spostiamo l'ordine e non cambiamo data/distributore dell'ordine storico.
+    // Se cambiano distributore o data sul vino, restano attributi del vino, non creano nuovi ordini.
     order.totals=calculateOrderTotals(order.lines||[]);
     order.updatedAt=S.now();
   }
@@ -546,20 +587,18 @@
   }
   function syncManualWineOrder(w, previous){
     if(!w || !w.distributorId || !w.lastOrderDate) return;
+
+    // Se il vino era già collegato a un ordine, NON creare/spostare ordini:
+    // aggiorna solo la riga già collegata nello stesso ordine.
     if(previous && previous.sourceOrderId){
-      const oldOrder=state.orders.find(o=>o.id===previous.sourceOrderId);
-      const sameOrder = oldOrder && oldOrder.distributorId===w.distributorId && String(oldOrder.date||'')===String(w.lastOrderDate||'');
-      if(sameOrder){
-        w.sourceOrderId=oldOrder.id;
-        w.sourceOrderLineId=previous.sourceOrderLineId;
-        updateLinkedOrderLineFromWine(w, previous);
-        return;
-      }
-      if(oldOrder){
-        oldOrder.lines=(oldOrder.lines||[]).filter(l=>l.sourceWineId!==w.id);
-        oldOrder.totals=calculateOrderTotals(oldOrder.lines||[]);
-      }
+      w.sourceOrderId=previous.sourceOrderId;
+      w.sourceOrderLineId=previous.sourceOrderLineId;
+      w.manualStock=Boolean(previous.manualStock);
+      updateLinkedOrderLineFromWine(w, previous);
+      return;
     }
+
+    // Solo un vino nuovo inserito manualmente in Cantina genera/aggiorna ordine automatico.
     let order=state.orders.find(o=>o.manualStock && o.distributorId===w.distributorId && String(o.date||'')===String(w.lastOrderDate||''));
     if(!order){
       order={id:S.uuid(),code:nextCode('ORD',state.orders),distributorId:w.distributorId,customerId:'',date:w.lastOrderDate,status:'ricevuto',paymentStatus:'da pagare',discountPreset:w.discountPreset||distributorDefaultDiscount(w.distributorId)||'none',notes:'Creato automaticamente da inserimento manuale in cantina.',manualStock:true,lines:[],createdAt:S.now()};
@@ -579,6 +618,41 @@
     state.sales.forEach(s=>(s.lines||[]).forEach(l=>protectedIds.add(l.wineId)));
     state.orders.forEach(o=>{ (o.lines||[]).forEach(l=>{ if(l.sourceWineId) protectedIds.add(l.sourceWineId); }); o.totals=calculateOrderTotals(o.lines||[]); });
     state.wines=state.wines.filter(w=> intQty(w.quantity)>0 || protectedIds.has(w.id) || !w.sourceOrderId);
+  }
+  function repairOrderCellarLinks(){
+    let changed=false;
+    state.orders.forEach(order=>{
+      order.lines = Array.isArray(order.lines) ? order.lines : [];
+      order.lines.forEach(line=>{
+        if(!line.id) { line.id=S.uuid(); changed=true; }
+        if(!line.sourceOrderLineId) { line.sourceOrderLineId=line.id; changed=true; }
+
+        let wine = line.sourceWineId ? getWine(line.sourceWineId) : null;
+        if(!wine){
+          wine = state.wines.find(w=>
+            w.sourceOrderId===order.id &&
+            (w.sourceOrderLineId===line.sourceOrderLineId ||
+              (norm(w.code)===norm(line.code) && norm(w.name)===norm(line.name) && norm(w.producer)===norm(line.producer) && String(w.vintage||'')===String(line.vintage||'') && String(w.size||'')===String(line.size||'')))
+          );
+        }
+        if(!wine && order.status==='ricevuto'){
+          wine={id:S.uuid(),notes:'',archived:false,createdAt:S.now(),quantity:intQty(line.quantity||0)};
+          state.wines.push(wine);
+          addMovement(wine.id,intQty(line.quantity||0),'riparazione collegamento ordine',order.date||todayISO(),`Collegamento ricostruito da ${order.code}`,'order',order.id);
+          changed=true;
+        }
+        if(wine){
+          line.sourceWineId=wine.id;
+          wine.sourceOrderId=order.id;
+          wine.sourceOrderLineId=line.sourceOrderLineId;
+          applyOrderFieldsToWine(wine,line,order);
+          changed=true;
+        }
+      });
+      const totals=calculateOrderTotals(order.lines||[]);
+      if(JSON.stringify(order.totals||{})!==JSON.stringify(totals)){ order.totals=totals; changed=true; }
+    });
+    return changed;
   }
 
   function quickAddDistributor(callback){ const name=prompt('Nome nuovo distributore'); if(!name) return; const d={id:S.uuid(),name:name.trim(),discountPreset:'none',archived:false,notes:'',createdAt:S.now()}; state.distributors.push(d); save(); toast('Distributore aggiunto.'); callback?.(d.id,d.name); }
@@ -908,6 +982,8 @@
   window.addEventListener('ambiguo:onlineLoaded', event => {
     if (!event.detail || !event.detail.state) return;
     state = event.detail.state;
+    repairOrderCellarLinks();
+    cleanupEmptyOrderWines();
     render();
     if (typeof toast === 'function') toast('Dati caricati online');
   });
@@ -925,5 +1001,7 @@
     console.warn('Errore caricamento online Redis.', event.detail?.error);
   });
 
+  repairOrderCellarLinks();
+  cleanupEmptyOrderWines();
   render();
 })();
