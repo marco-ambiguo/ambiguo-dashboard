@@ -297,9 +297,8 @@
     const isExpanded = expandedOrders.has(o.id);
     const visibleLines = isExpanded ? o.lines : o.lines.slice(0, 5);
     const rows=visibleLines.map(l=>{ const t=lineTotals(l); return `<tr><td class="cell-title">${esc(l.code)}</td><td>${esc(l.name)}</td><td>${esc(l.producer)}</td><td>${esc(l.vintage||'—')}</td><td>${tagBadge(l.tag)}</td><td>${number(l.quantity)}</td><td>${money(l.netUnitPrice)}</td><td>${discountLabel(l)}</td><td>${money(l.resalePrice)}</td><td>${money(t.grossTotal)}</td></tr>`; }).join('');
-    const toggle = o.lines.length > 5 ? `<button class="order-expand-toggle" data-action="toggle-order-lines" data-id="${o.id}" title="${isExpanded?'Raggruppa righe':'Espandi righe'}" aria-label="${isExpanded?'Raggruppa righe':'Espandi righe'}"><span>${isExpanded?'Raggruppa':'Mostra tutte'}</span><strong>${isExpanded?'↑':'↓'}</strong></button>` : '';
-    const hiddenInfo = (!isExpanded && o.lines.length>5) ? `<div class="order-hidden-info">+ altre ${o.lines.length-5} righe</div>` : '';
-    return `<article class="order-card"><div class="order-card-head"><div><div class="order-date">${dateIT(o.date)}</div><h2>${esc(distributorName(o.distributorId))}</h2><p>${o.customerId?`Cliente ref. ${esc(customerName(o.customerId))}`:'Nessun cliente associato'} · ${esc(o.code)}</p></div><div class="order-total"><strong>${money(o.totals?.grossTotal)}</strong><span>${number(o.totals?.quantity)} bottiglie · ${number(o.lines.length)} referenze</span><span class="badge">${esc(o.status)}</span><span class="badge">${esc(o.paymentStatus||'da pagare')}</span></div></div><div class="table-scroll compact"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${rows}</tbody></table></div>${hiddenInfo}<div class="order-card-actions"><div class="order-card-actions-left">${toggle}</div><div class="order-card-actions-right"><button class="btn small secondary" data-action="edit-order" data-id="${o.id}">Modifica dati</button><button class="btn small ghost" data-action="view-order" data-id="${o.id}">Apri dettaglio</button><button class="btn small ghost" data-action="duplicate-order" data-id="${o.id}">Duplica</button><button class="btn small danger" data-action="delete-order" data-id="${o.id}">Elimina</button></div></div></article>`;
+    const toggle = o.lines.length > 5 ? `<button class="order-expand-toggle icon-only" data-action="toggle-order-lines" data-id="${o.id}" title="${isExpanded?'Raggruppa righe':'Mostra tutte le righe'}" aria-label="${isExpanded?'Raggruppa righe':'Mostra tutte le righe'}"><span aria-hidden="true">${isExpanded?'↑':'↓'}</span></button>` : '';
+    return `<article class="order-card"><div class="order-card-head"><div><div class="order-date">${dateIT(o.date)}</div><h2>${esc(distributorName(o.distributorId))}</h2><p>${o.customerId?`Cliente ref. ${esc(customerName(o.customerId))}`:'Nessun cliente associato'} · ${esc(o.code)}</p></div><div class="order-total"><strong>${money(o.totals?.grossTotal)}</strong><span>${number(o.totals?.quantity)} bottiglie · ${number(o.lines.length)} referenze</span><span class="badge">${esc(o.status)}</span><span class="badge">${esc(o.paymentStatus||'da pagare')}</span></div></div><div class="table-scroll compact"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${rows}</tbody></table></div><div class="order-card-actions"><div class="order-card-actions-left">${toggle}</div><div class="order-card-actions-right"><button class="btn small secondary" data-action="edit-order" data-id="${o.id}">Modifica dati</button><button class="btn small ghost" data-action="view-order" data-id="${o.id}">Apri dettaglio</button><button class="btn small ghost" data-action="duplicate-order" data-id="${o.id}">Duplica</button><button class="btn small danger" data-action="delete-order" data-id="${o.id}">Elimina</button></div></div></article>`;
   }
 
   function renderVendite(){ const sales=filteredSales().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))); views.vendite.innerHTML=`<div class="section-head"><span class="small-muted">Ordini dei clienti, vendite e uscite dalla cantina.</span><button class="btn primary" data-action="new-sale">Nuovo ordine cliente</button></div><div class="card table-card">${sales.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Codice</th><th>Cliente</th><th>Stato</th><th>Pagamento</th><th>Mandati a</th><th>Bottiglie</th><th>Totale</th><th>Costo bottiglie</th><th>Margine</th><th>Note</th><th></th></tr></thead><tbody>${sales.map(s=>`<tr><td class="cell-title">${dateIT(s.date)}</td><td>${esc(s.code)}</td><td>${esc(customerName(s.customerId))}</td><td><span class="badge">${esc(s.status)}</span></td><td>${esc(s.paymentMethod||'—')}</td><td>${esc(s.paymentRecipient||'—')}</td><td>${number(s.totals?.quantity)}</td><td>${money(s.totals?.total)}</td><td>${money(s.totals?.cost)}</td><td>${money(s.totals?.margin)}</td><td>${esc(s.notes||'—')}</td><td><div class="actions"><button class="btn small secondary" data-action="edit-sale" data-id="${s.id}">Modifica</button><button class="btn small ghost" data-action="duplicate-sale" data-id="${s.id}">Duplica</button><button class="btn small danger" data-action="delete-sale" data-id="${s.id}">Elimina</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun ordine cliente registrato.</div>`}</div>`; bindInlineActions(); }
@@ -660,6 +659,248 @@
   function openDistributorModal(id){ const d=id?state.distributors.find(x=>x.id===id):{id:S.uuid(),name:'',discountPreset:'none',notes:'',archived:false}; openModal({title:id?'Modifica distributore':'Nuovo distributore',body:`<div class="form-grid one">${field('Nome','distName',d.name,'text')}${field('Sconto predefinito','distDiscountPreset',d.discountPreset||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Note</label><textarea id="f_distNotes">${esc(d.notes||'')}</textarea></div>${field('Stato','distArchived',String(Boolean(d.archived)),'selectPairs',[['false','Attivo'],['true','Archiviato']])}</div>`,primary:'Salva',onPrimary:()=>{ if(!val('distName').trim()) return toast('Inserisci il nome.'); Object.assign(d,{name:val('distName').trim(),discountPreset:val('distDiscountPreset')||'none',notes:val('distNotes'),archived:val('distArchived')==='true',updatedAt:S.now()}); if(!id) state.distributors.push({...d,createdAt:S.now()}); save(); closeModal(); toast('Distributore salvato.'); render(); }}); }
   function openCustomerModal(id){ const c=id?state.customers.find(x=>x.id===id):{id:S.uuid(),name:'',type:'privato',email:'',phone:'',address:'',vat:'',taxCode:'',notes:'',archived:false}; openModal({title:id?'Modifica cliente':'Nuovo cliente',body:`<div class="form-grid">${field('Nome / ragione sociale','customerName',c.name,'text')}${field('Tipologia','customerType',c.type,'select',CUSTOMER_TYPES)}${field('Email','customerEmail',c.email,'text')}${field('Telefono','customerPhone',c.phone,'text')}<div class="field" style="grid-column:1/-1"><label>Indirizzo</label><input id="f_customerAddress" value="${esc(c.address||'')}"></div>${field('Partita IVA','customerVat',c.vat,'text')}${field('Codice fiscale','customerTaxCode',c.taxCode,'text')}<div class="field" style="grid-column:1/-1"><label>Note</label><textarea id="f_customerNotes">${esc(c.notes||'')}</textarea></div>${field('Stato','customerArchived',String(Boolean(c.archived)),'selectPairs',[['false','Attivo'],['true','Archiviato']])}</div>`,primary:'Salva',onPrimary:()=>{ if(!val('customerName').trim()) return toast('Inserisci il nome cliente.'); Object.assign(c,{name:val('customerName').trim(),type:val('customerType'),email:val('customerEmail'),phone:val('customerPhone'),address:val('customerAddress'),vat:val('customerVat'),taxCode:val('customerTaxCode'),notes:val('customerNotes'),archived:val('customerArchived')==='true',updatedAt:S.now()}); if(!id) state.customers.push({...c,createdAt:S.now()}); save(); closeModal(); toast('Cliente salvato.'); render(); }}); }
   function openHistory(id){ const w=getWine(id); const rows=state.movements.filter(m=>m.wineId===id).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))); openModal({title:`Storico — ${w?.name||''}`,subtitle:w?`${w.code} · ${w.producer}`:'',body:rows.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Tipo</th><th>Quantità</th><th>Origine</th><th>Nota</th></tr></thead><tbody>${rows.map(m=>`<tr><td>${dateIT(m.date)}</td><td>${esc(m.type)}</td><td>${m.quantityChange>0?'+':''}${number(m.quantityChange)}</td><td>${esc(m.sourceType||'manuale')}</td><td>${esc(m.note||'—')}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun movimento.</div>`,primary:'Chiudi',onPrimary:closeModal}); }
+
+
+  function availableWineOptions(selectedId=''){
+    return state.wines
+      .filter(w=>!w.archived && (intQty(w.quantity)>0 || w.id===selectedId))
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')))
+      .map(w=>[w.id, `${w.code || '—'} — ${w.name || 'Senza nome'} · ${w.producer || '—'} · ${w.vintage || '—'} (${intQty(w.quantity)} disp.)`]);
+  }
+
+  function emptySaleLine(){
+    const first=state.wines.find(w=>!w.archived && intQty(w.quantity)>0) || state.wines.find(w=>!w.archived) || null;
+    return {
+      id:S.uuid(),
+      wineId:first?.id || '',
+      quantity:1,
+      unitPrice:Number(first?.resalePrice||0),
+      discount:0,
+      costTotal:0,
+      manualPrice:false
+    };
+  }
+
+  function calculateSaleTotals(lines){
+    return (lines||[]).reduce((acc,l)=>{
+      const t=saleLineTotals(l);
+      acc.quantity+=intQty(l.quantity||0);
+      acc.theoretical+=t.theoretical;
+      acc.discount+=parseAmount(l.discount||0);
+      acc.total+=t.total;
+      acc.cost+=t.cost;
+      acc.margin+=t.margin;
+      return acc;
+    },{quantity:0,theoretical:0,discount:0,total:0,cost:0,margin:0});
+  }
+
+  function saleShouldAffectStock(sale){
+    return sale && !['bozza','annullato'].includes(String(sale.status||''));
+  }
+
+  function reverseSaleStock(sale){
+    if(!sale || sale.stockReversed) return;
+    (sale.lines||[]).forEach(l=>{
+      const w=getWine(l.wineId);
+      const qty=intQty(l.quantity||0);
+      if(w && qty>0){
+        w.quantity=intQty(w.quantity)+qty;
+        addMovement(w.id,qty,'rettifica annullamento vendita',sale.date||todayISO(),`Ripristino ${sale.code||'ordine cliente'}`,'sale',sale.id);
+      }
+    });
+    sale.stockApplied=false;
+    sale.stockReversed=true;
+  }
+
+  function applySaleStock(sale){
+    if(!sale || sale.stockApplied) return true;
+    for(const l of sale.lines||[]){
+      const w=getWine(l.wineId);
+      const qty=intQty(l.quantity||0);
+      if(!w) { toast('Un vino selezionato non esiste più in cantina.'); return false; }
+      if(qty<=0) { toast('Ogni riga cliente deve avere quantità maggiore di zero.'); return false; }
+      if(!state.settings.allowNegativeStock && intQty(w.quantity)<qty){
+        toast(`Stock insufficiente per ${w.name}: disponibili ${intQty(w.quantity)}, richieste ${qty}.`);
+        return false;
+      }
+    }
+    (sale.lines||[]).forEach(l=>{
+      const w=getWine(l.wineId);
+      const qty=intQty(l.quantity||0);
+      const historicalCost=lineTotals(w).grossUnit*qty;
+      l.costTotal=round2(historicalCost);
+      w.quantity=intQty(w.quantity)-qty;
+      addMovement(w.id,-qty,'vendita',sale.date||todayISO(),`Ordine cliente ${sale.code||''}`,'sale',sale.id);
+    });
+    sale.stockApplied=true;
+    sale.stockReversed=false;
+    sale.totals=calculateSaleTotals(sale.lines||[]);
+    return true;
+  }
+
+  function openSaleModal(id, duplicate=false){
+    const old=id?state.sales.find(s=>s.id===id):null;
+    const isEdit=Boolean(old)&&!duplicate;
+    const source=old?JSON.parse(JSON.stringify(old)):null;
+    const sale=source&&!duplicate?source:null;
+    const initialLines=(source?.lines?.length?source.lines:[emptySaleLine()]).map(l=>({
+      id: duplicate ? S.uuid() : (l.id||S.uuid()),
+      wineId:l.wineId||'',
+      quantity:intQty(l.quantity||1),
+      unitPrice:parseAmount(l.unitPrice ?? getWine(l.wineId)?.resalePrice ?? 0),
+      discount:parseAmount(l.discount||0),
+      costTotal:duplicate ? 0 : Number(l.costTotal||0),
+      manualPrice:Boolean(l.manualPrice)
+    }));
+
+    openModal({
+      title:isEdit?'Modifica ordine cliente':duplicate?'Duplica ordine cliente':'Nuovo ordine cliente',
+      subtitle:'Il prezzo proposto arriva dal resell Ambiguo, ma puoi modificarlo manualmente riga per riga.',
+      body:`<div class="form-grid order-meta-grid">
+        <div class="field"><label>Cliente</label><div style="display:flex; gap:8px"><select id="f_saleCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${source?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInSale" type="button">+</button></div></div>
+        ${field('Data','saleDate',source?.date||todayISO(),'date')}
+        ${field('Stato','saleStatus',source?.status||'pagato','select',SALE_STATUSES)}
+        ${field('Metodo pagamento','salePaymentMethod',source?.paymentMethod||'cash','select',PAYMENT_METHODS)}
+        ${field('Mandati a','salePaymentRecipient',source?.paymentRecipient||'Marco','select',PAYMENT_RECIPIENTS)}
+      </div>
+      <div class="section-head"><h2>Vini</h2><button class="btn secondary" id="addSaleLineBtn" type="button">Aggiungi vino</button></div>
+      <div id="saleLines"></div>
+      <div class="summary-box soft-summary" id="saleTotals" style="margin-top:16px"></div>
+      <div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_saleNotes">${esc(source?.notes||'')}</textarea></div>`,
+      primary:isEdit?'Salva modifiche':'Salva ordine cliente',
+      onPrimary:()=>saveSaleFromModal(isEdit?old:null, source)
+    });
+
+    window.__saleLines=initialLines;
+    renderSaleLines();
+    document.getElementById('addSaleLineBtn')?.addEventListener('click',()=>{ syncSaleLinesFromDom(); window.__saleLines.push(emptySaleLine()); renderSaleLines(); });
+    document.getElementById('addCustomerInSale')?.addEventListener('click',()=>quickAddCustomer((cid,name)=>{ const sel=document.getElementById('f_saleCustomer'); sel.insertAdjacentHTML('beforeend',`<option value="${cid}">${esc(name)}</option>`); sel.value=cid; }));
+    bindFormEnhancements();
+  }
+
+  function renderSaleLines(){
+    const root=document.getElementById('saleLines');
+    if(!root) return;
+    root.innerHTML=window.__saleLines.map((l,i)=>{
+      const w=getWine(l.wineId);
+      const options=availableWineOptions(l.wineId);
+      return `<div class="order-line sale-line" data-index="${i}">
+        <div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small ghost" data-sale-line-action="duplicate" data-index="${i}" type="button">Duplica</button><button class="btn small secondary" data-sale-line-action="remove" data-index="${i}" type="button">Elimina</button></div></div>
+        <div class="order-line-grid sale-line-grid">
+          ${field('Vino',`s_${i}_wineId`,l.wineId,'selectPairs',options)}
+          ${field('Disponibili',`s_${i}_available`,w?intQty(w.quantity):0,'number')}
+          ${field('Quantità',`s_${i}_quantity`,l.quantity,'number')}
+          ${field('Prezzo resell base',`s_${i}_resaleBase`,w?Number(w.resalePrice||0):0,'number')}
+          ${field('Prezzo applicato',`s_${i}_unitPrice`,l.unitPrice,'number')}
+          ${field('Sconto €',`s_${i}_discount`,l.discount||0,'number')}
+        </div>
+        <div class="summary-box line-summary soft-summary" id="sale_line_total_${i}"></div>
+      </div>`;
+    }).join('');
+
+    root.querySelectorAll('[id$="_available"],[id$="_resaleBase"]').forEach(el=>{ el.disabled=true; });
+    root.querySelectorAll('[data-sale-line-action]').forEach(btn=>btn.addEventListener('click',()=>{
+      syncSaleLinesFromDom();
+      const i=Number(btn.dataset.index);
+      if(btn.dataset.saleLineAction==='remove' && window.__saleLines.length>1) window.__saleLines.splice(i,1);
+      if(btn.dataset.saleLineAction==='duplicate') window.__saleLines.splice(i+1,0,{...window.__saleLines[i],id:S.uuid(),costTotal:0});
+      renderSaleLines();
+    }));
+
+    root.querySelectorAll('select[id^="f_s_"][id$="_wineId"]').forEach(sel=>sel.addEventListener('change',()=>{
+      const i=Number(sel.id.match(/f_s_(\d+)_wineId/)?.[1]||0);
+      const w=getWine(sel.value);
+      syncSaleLinesFromDom();
+      window.__saleLines[i].wineId=sel.value;
+      window.__saleLines[i].unitPrice=Number(w?.resalePrice||0);
+      window.__saleLines[i].manualPrice=false;
+      renderSaleLines();
+    }));
+
+    root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ syncSaleLinesFromDom(); updateSaleTotals(); }));
+    updateSaleTotals();
+    bindFormEnhancements();
+  }
+
+  function syncSaleLinesFromDom(){
+    window.__saleLines=window.__saleLines.map((l,i)=>{
+      const w=getWine(val(`s_${i}_wineId`));
+      const unit=parseAmount(val(`s_${i}_unitPrice`));
+      const base=Number(w?.resalePrice||0);
+      return {
+        id:l.id||S.uuid(),
+        wineId:val(`s_${i}_wineId`),
+        quantity:intQty(val(`s_${i}_quantity`)),
+        unitPrice:unit,
+        discount:parseAmount(val(`s_${i}_discount`)),
+        costTotal:Number(l.costTotal||0),
+        manualPrice:Math.abs(unit-base)>0.009
+      };
+    });
+  }
+
+  function updateSaleTotals(){
+    let totals={quantity:0,theoretical:0,discount:0,total:0,cost:0,margin:0};
+    (window.__saleLines||[]).forEach((l,i)=>{
+      const w=getWine(l.wineId);
+      const t=saleLineTotals(l);
+      totals.quantity+=intQty(l.quantity||0);
+      totals.theoretical+=t.theoretical;
+      totals.discount+=parseAmount(l.discount||0);
+      totals.total+=t.total;
+      totals.cost+=Number(l.costTotal||0);
+      totals.margin=totals.total-totals.cost;
+      const el=document.getElementById(`sale_line_total_${i}`);
+      if(el) el.innerHTML=`<div class="summary-row"><span>Resell base</span><strong>${money(w?.resalePrice||0)}</strong></div><div class="summary-row"><span>Prezzo applicato</span><strong>${money(l.unitPrice)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.total)}</strong></div>${l.manualPrice?`<div class="summary-row"><span>Nota</span><strong>Prezzo modificato manualmente</strong></div>`:''}`;
+    });
+    const root=document.getElementById('saleTotals');
+    if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(totals.quantity)}</strong></div><div class="summary-row"><span>Totale teorico</span><strong>${money(totals.theoretical)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(totals.discount)}</strong></div><div class="summary-row"><span>Totale cliente</span><strong>${money(totals.total)}</strong></div><div class="summary-row"><span>Costo storico</span><strong>${money(totals.cost)}</strong></div><div class="summary-row"><span>Margine</span><strong>${money(totals.margin)}</strong></div>`;
+  }
+
+  function saveSaleFromModal(existing, originalSnapshot){
+    syncSaleLinesFromDom();
+    const lines=(window.__saleLines||[]).filter(l=>l.wineId && intQty(l.quantity)>0);
+    if(!lines.length) return toast('Aggiungi almeno un vino.');
+    if(!val('saleCustomer')) return toast('Seleziona o crea un cliente.');
+    for(const l of lines){
+      const w=getWine(l.wineId);
+      if(!w) return toast('Un vino selezionato non esiste.');
+      if(parseAmount(l.unitPrice)<0) return toast('Prezzo applicato non valido.');
+      if(parseAmount(l.discount)<0) return toast('Sconto non valido.');
+    }
+
+    if(existing && saleShouldAffectStock(existing)) reverseSaleStock(existing);
+
+    const sale={
+      id:existing?.id||S.uuid(),
+      code:existing?.code||nextCode('CLI',state.sales),
+      customerId:val('saleCustomer'),
+      date:val('saleDate')||todayISO(),
+      status:val('saleStatus')||'pagato',
+      paymentMethod:val('salePaymentMethod')||'',
+      paymentRecipient:val('salePaymentRecipient')||'',
+      notes:val('saleNotes'),
+      lines:lines.map(l=>({...l,costTotal:0})),
+      createdAt:existing?.createdAt||S.now(),
+      updatedAt:S.now(),
+      demo:existing?.demo||false,
+      stockApplied:false,
+      stockReversed:false
+    };
+
+    sale.totals=calculateSaleTotals(sale.lines);
+    if(saleShouldAffectStock(sale)){
+      if(!applySaleStock(sale)){
+        // Se stavi modificando, ripristina lo snapshot precedente per evitare mezze modifiche.
+        if(existing && originalSnapshot){ Object.assign(existing, originalSnapshot); if(saleShouldAffectStock(existing)) applySaleStock(existing); }
+        return;
+      }
+    }
+    sale.totals=calculateSaleTotals(sale.lines);
+
+    if(existing) Object.assign(existing,sale); else state.sales.push(sale);
+    save(); closeModal(); toast(existing?'Ordine cliente aggiornato.':'Ordine cliente salvato.'); render();
+  }
 
 
   function deleteWine(id){
