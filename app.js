@@ -1198,7 +1198,7 @@
 
   function drawBarChart(id, labels, series, names){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c.width, H=c.height;
+    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
     const pad={l:54,r:34,t:50,b:46};
     ctx.clearRect(0,0,W,H);
     const vals=series.flat().map(v=>Number(v||0));
@@ -1228,7 +1228,7 @@
 
   function drawLineChart(id, labels, values, label=''){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c.width, H=c.height;
+    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
     const pad={l:58,r:40,t:42,b:46};
     ctx.clearRect(0,0,W,H);
     const max=niceMax(Math.max(...values.map(v=>Number(v||0)),0));
@@ -1274,7 +1274,7 @@
 
   function drawSingleBarChart(id, items, label='Valore'){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c.width, H=c.height;
+    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
     ctx.clearRect(0,0,W,H);
     if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
     const pad={l:116,r:38,t:34,b:30};
@@ -1305,7 +1305,7 @@
 
   function drawDonutChart(id,items){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c.width, H=c.height;
+    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
     ctx.clearRect(0,0,W,H);
     if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); return; }
     const total=items.reduce((s,i)=>s+Number(i.value||0),0);
@@ -1349,9 +1349,22 @@
     ctx.textAlign='left';
   }
   function setupCanvas(c){
-    const r=c.getBoundingClientRect();
-    c.width=Math.max(320,Math.floor(r.width));
-    c.height=Math.max(180,Math.floor(r.height));
+    const rect = c.getBoundingClientRect();
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = Math.max(320, Math.floor(rect.width));
+    const cssH = Math.max(180, Math.floor(rect.height));
+
+    c.style.width = cssW + 'px';
+    c.style.height = cssH + 'px';
+    c.width = Math.floor(cssW * dpr);
+    c.height = Math.floor(cssH * dpr);
+
+    c._chartW = cssW;
+    c._chartH = cssH;
+    c._chartDpr = dpr;
+
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   function niceMax(v){
     if(v<=0) return 0;
