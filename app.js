@@ -366,9 +366,10 @@
     const qty = w => Number(w.quantity || 0);
     const mode = stockMode || 'available';
 
-    // Default: la Cantina deve mostrare subito solo ciò che rimane davvero disponibile.
-    // Anche “Tutto lo stock” indica lo stock presente, quindi esclude sempre quantità 0.
-    if(mode === 'available' || mode === 'all') return wines.filter(w => qty(w) > 0);
+    // Default: la Cantina apre su “Disponibili”, cioè solo bottiglie rimaste.
+    // “Tutto lo stock” invece deve mostrare anche le referenze finite/zero.
+    if(mode === 'available') return wines.filter(w => qty(w) > 0);
+    if(mode === 'all') return wines;
     if(mode === 'low') return wines.filter(w => qty(w) > 0 && qty(w) <= Number(state.settings.lowStockThreshold || 3));
     if(mode === 'empty') return wines.filter(w => qty(w) <= 0);
     return wines.filter(w => qty(w) > 0);
