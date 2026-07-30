@@ -274,16 +274,9 @@
         ${statCard('Incassato',money(st.salesGross),'Ordini clienti')}
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
-      <div class="grid three dashboard-charts">
-        <div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap small"><canvas id="chartInventory"></canvas></div></div>
-        <div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap small"><canvas id="chartBottles"></canvas></div></div>
-        <div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div>
-      </div>
-      <div class="grid three dashboard-charts">
-        <div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div>
-        <div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div>
-        <div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div>
-      </div>`;
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap"><canvas id="chartInventory"></canvas></div></div><div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap"><canvas id="chartBottles"></canvas></div></div></div>
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div><div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div></div>`;
     drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
     drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
@@ -567,7 +560,7 @@
   function openMovementModal(){ openModal({title:'Movimento manuale',subtitle:'Ogni modifica quantità viene tracciata nello storico.',body:`<div class="form-grid">${field('Vino','wineId','', 'selectPairs', state.wines.map(w=>[w.id,`${w.code} — ${w.name} (${w.quantity} disp.)`]))}${field('Tipo movimento','type','scarico manuale','select',['carico manuale','scarico manuale','bottiglia degustata','omaggio','bottiglia danneggiata','rettifica inventario','prelievo personale','reso'])}${field('Quantità','quantity',1,'number')}${field('Data','date',todayISO(),'date')}<div class="field" style="grid-column:1/-1"><label>Motivo / nota</label><textarea id="f_note"></textarea></div></div>`,primary:'Registra movimento',onPrimary:()=>{ const wine=getWine(val('wineId')); if(!wine) return toast('Seleziona un vino.'); const qty=Math.abs(intQty(val('quantity'))); if(!qty) return toast('Inserisci una quantità valida.'); const type=val('type'), positive=['carico manuale','reso'].includes(type), delta=positive?qty:-qty; if(!state.settings.allowNegativeStock&&Number(wine.quantity||0)+delta<0) return toast('Stock insufficiente.'); wine.quantity=Number(wine.quantity||0)+delta; addMovement(wine.id,delta,type,val('date'),val('note')); save(); closeModal(); toast('Movimento registrato.'); render(); }}); }
   function addMovement(wineId,quantityChange,type,date,note,sourceType='manuale',sourceId=''){ state.movements.push({id:S.uuid(),wineId,quantityChange:Number(quantityChange),type,date:date||todayISO(),note:note||'',sourceType,sourceId,createdAt:S.now()}); }
 
-  function openOrderModal(id, duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.orders.find(o=>o.id===id):null; const order=old?JSON.parse(JSON.stringify(old)):null; const initialLines=order?.lines?.length?order.lines:[emptyOrderLine()]; openModal({title:isEdit?'Modifica ordine distributore':duplicate?'Duplica ordine distributore':'Nuovo ordine distributore',subtitle:'Inserisci prima la data. Non devi scegliere nessun numero ordine: viene creato un codice interno automatico.',body:`<div class="form-grid order-meta-grid">${field('Data ordine','orderDate',order?.date||todayISO(),'date')}<div class="field"><label>Distributore</label><div style="display:flex; gap:8px"><select id="f_orderDistributor">${activeDistributors().map(d=>`<option value="${d.id}" ${order?.distributorId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select><button class="btn secondary" id="addDistributorInOrder" type="button">+</button></div></div>${field('Sconto ordine proposto','orderDiscountPreset',order?.discountPreset||distributorDefaultDiscount(order?.distributorId||activeDistributors()[0]?.id)||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Cliente associato, opzionale</label><div style="display:flex; gap:8px"><select id="f_orderCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${order?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInOrder" type="button">+</button></div></div>${field('Stato','orderStatus',order?.status||'ricevuto','select',['bozza','ricevuto'])}${field('Pagamento','orderPaymentStatus',order?.paymentStatus||'da pagare','select',['da pagare','pagato'])}</div><div class="section-head"><h2>Referenze</h2><button class="btn secondary" id="addOrderLineBtn" type="button">Aggiungi riga</button></div><div id="orderLines"></div><div class="summary-box" id="orderTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_orderNotes">${esc(order?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine',onPrimary:()=>saveOrderFromModal(isEdit?old:null),footerLeft:'<button class="btn secondary" id="addOrderLineBottomBtn" type="button">+ Aggiungi vino</button>'}); window.__orderLines=initialLines.map(l=>({...emptyOrderLine(),...l})); if(!old){ const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset})); } renderOrderLines(); document.getElementById('addOrderLineBtn').addEventListener('click',()=>{ window.__orderLines.push(emptyOrderLine()); renderOrderLines(); }); document.getElementById('addOrderLineBottomBtn')?.addEventListener('click',()=>{ syncOrderLinesFromDom(); window.__orderLines.push(emptyOrderLine()); renderOrderLines(); setTimeout(()=>document.querySelector('#orderLines .order-line-card:last-child input, #orderLines .order-line-card:last-child select')?.focus(),0); }); document.getElementById('f_orderDistributor').addEventListener('change',()=>{ const preset=distributorDefaultDiscount(val('orderDistributor')); const discountField=document.getElementById('f_orderDiscountPreset'); if(discountField && !isEdit) discountField.value=preset||'none'; }); document.getElementById('f_orderDiscountPreset')?.addEventListener('change',()=>{ syncOrderLinesFromDom(); const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset,discount1:0,discount2:0,discount3:0})); renderOrderLines(); }); document.getElementById('addDistributorInOrder').addEventListener('click',()=>quickAddDistributor((id,name)=>{ const select=document.getElementById('f_orderDistributor'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; const df=document.getElementById('f_orderDiscountPreset'); if(df) df.value=distributorDefaultDiscount(id)||'none'; })); document.getElementById('addCustomerInOrder').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_orderCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
+  function openOrderModal(id, duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.orders.find(o=>o.id===id):null; const order=old?JSON.parse(JSON.stringify(old)):null; const initialLines=order?.lines?.length?order.lines:[emptyOrderLine()]; openModal({title:isEdit?'Modifica ordine distributore':duplicate?'Duplica ordine distributore':'Nuovo ordine distributore',subtitle:'Inserisci prima la data. Non devi scegliere nessun numero ordine: viene creato un codice interno automatico.',body:`<div class="form-grid order-meta-grid">${field('Data ordine','orderDate',order?.date||todayISO(),'date')}<div class="field"><label>Distributore</label><div style="display:flex; gap:8px"><select id="f_orderDistributor">${activeDistributors().map(d=>`<option value="${d.id}" ${order?.distributorId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select><button class="btn secondary" id="addDistributorInOrder" type="button">+</button></div></div>${field('Sconto ordine proposto','orderDiscountPreset',order?.discountPreset||distributorDefaultDiscount(order?.distributorId||activeDistributors()[0]?.id)||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Cliente associato, opzionale</label><div style="display:flex; gap:8px"><select id="f_orderCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${order?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInOrder" type="button">+</button></div></div>${field('Stato','orderStatus',order?.status||'ricevuto','select',['bozza','ricevuto'])}${field('Pagamento','orderPaymentStatus',order?.paymentStatus||'da pagare','select',['da pagare','pagato'])}</div><div class="section-head"><h2>Referenze</h2><button class="btn secondary" id="addOrderLineBtn" type="button">Aggiungi riga</button></div><div id="orderLines"></div><div class="modal-inline-actions bottom-add-row"><button class="btn secondary" id="addOrderLineBottomBtn" type="button">Aggiungi vino</button></div><div class="summary-box" id="orderTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_orderNotes">${esc(order?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine',onPrimary:()=>saveOrderFromModal(isEdit?old:null)}); window.__orderLines=initialLines.map(l=>({...emptyOrderLine(),...l})); if(!old){ const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset})); } renderOrderLines(); document.getElementById('addOrderLineBtn').addEventListener('click',()=>{ window.__orderLines.push(emptyOrderLine()); renderOrderLines(); }); document.getElementById('addOrderLineBottomBtn')?.addEventListener('click',()=>{ syncOrderLinesFromDom(); window.__orderLines.push(emptyOrderLine()); renderOrderLines(); setTimeout(()=>document.querySelector('#orderLines .order-line-card:last-child input, #orderLines .order-line-card:last-child select')?.focus(),0); }); document.getElementById('f_orderDistributor').addEventListener('change',()=>{ const preset=distributorDefaultDiscount(val('orderDistributor')); const discountField=document.getElementById('f_orderDiscountPreset'); if(discountField && !isEdit) discountField.value=preset||'none'; }); document.getElementById('f_orderDiscountPreset')?.addEventListener('change',()=>{ syncOrderLinesFromDom(); const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset,discount1:0,discount2:0,discount3:0})); renderOrderLines(); }); document.getElementById('addDistributorInOrder').addEventListener('click',()=>quickAddDistributor((id,name)=>{ const select=document.getElementById('f_orderDistributor'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; const df=document.getElementById('f_orderDiscountPreset'); if(df) df.value=distributorDefaultDiscount(id)||'none'; })); document.getElementById('addCustomerInOrder').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_orderCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
   function emptyOrderLine(){ return {code:'',name:'',producer:'',vintage:'',size:'0.75',tag:'bianco',netUnitPrice:0,discountPreset:val('orderDiscountPreset')||'none',discount1:0,discount2:0,discount3:0,resalePrice:0,quantity:1,vatRate:state.settings.vatRate}; }
   function renderOrderLines(){ const root=document.getElementById('orderLines'); root.innerHTML=window.__orderLines.map((l,i)=>`<div class="order-line" data-index="${i}"><div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small ghost" data-line-action="duplicate" data-index="${i}">Duplica</button><button class="btn small secondary" data-line-action="remove" data-index="${i}">Elimina</button></div></div><div class="order-line-grid">${field('Codice',`l_${i}_code`,l.code,'text')}${field('Nome vino',`l_${i}_name`,l.name,'text')}${field('Cantina',`l_${i}_producer`,l.producer,'text')}${field('Annata',`l_${i}_vintage`,l.vintage,'text')}${field('Dimensione',`l_${i}_size`,l.size,'select',['0.75','1.5l','1l','magnum','altro'])}${field('Tag',`l_${i}_tag`,l.tag,'select',TAGS)}${field('Listino no IVA',`l_${i}_netUnitPrice`,l.netUnitPrice,'number')}${field('Sconto',`l_${i}_discountPreset`,l.discountPreset||'none','selectPairs',DISCOUNT_PRESETS)}${field('Manuale 1 %',`l_${i}_discount1`,l.discount1||0,'number')}${field('Manuale 2 %',`l_${i}_discount2`,l.discount2||0,'number')}${field('Manuale 3 %',`l_${i}_discount3`,l.discount3||0,'number')}${field('Resell Ambiguo',`l_${i}_resalePrice`,l.resalePrice||0,'number')}${field('Quantità',`l_${i}_quantity`,l.quantity,'number')}${field('IVA %',`l_${i}_vatRate`,l.vatRate,'number')}</div><div class="summary-box line-summary soft-summary" id="line_total_${i}"></div></div>`).join(''); root.querySelectorAll('[data-line-action]').forEach(btn=>btn.addEventListener('click',()=>{ syncOrderLinesFromDom(); const i=Number(btn.dataset.index); if(btn.dataset.lineAction==='remove'&&window.__orderLines.length>1) window.__orderLines.splice(i,1); if(btn.dataset.lineAction==='duplicate'){ const copy={...window.__orderLines[i],id:S.uuid(),sourceWineId:'',sourceOrderLineId:S.uuid()}; window.__orderLines.splice(i+1,0,copy); } renderOrderLines(); })); root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ syncOrderLinesFromDom(); updateOrderTotals(); })); updateOrderTotals(); }
   function syncOrderLinesFromDom(){ window.__orderLines=window.__orderLines.map((l,i)=>({id:l.id,sourceWineId:l.sourceWineId||'',sourceOrderLineId:l.sourceOrderLineId||l.id||'',manualStock:Boolean(l.manualStock),code:val(`l_${i}_code`),name:val(`l_${i}_name`),producer:val(`l_${i}_producer`),vintage:val(`l_${i}_vintage`),size:val(`l_${i}_size`),tag:val(`l_${i}_tag`),netUnitPrice:parseAmount(val(`l_${i}_netUnitPrice`)),discountPreset:val(`l_${i}_discountPreset`)||'none',discount1:parseAmount(val(`l_${i}_discount1`)),discount2:parseAmount(val(`l_${i}_discount2`)),discount3:parseAmount(val(`l_${i}_discount3`)),resalePrice:parseAmount(val(`l_${i}_resalePrice`)),quantity:intQty(val(`l_${i}_quantity`)),vatRate:parseAmount(val(`l_${i}_vatRate`)||state.settings.vatRate)})); }
@@ -1193,63 +1186,56 @@
   function resetAll(){ if(!confirm('Prima conferma: vuoi cancellare tutti i dati?')) return; if(!confirm('Seconda conferma: questa azione non si può annullare.')) return; state=S.reset(); toast('Dati cancellati.'); render(); }
 
   const CHART_ORANGE = '#c36522';
-  const CHART_GRAY = '#9b9892';
-  const CHART_GRAY_LIGHT = '#d7d2cb';
-  const CHART_GRID = 'rgba(32,28,24,.075)';
-  const CHART_TEXT = '#5f5b55';
-  const CHART_BLACK = '#171717';
+  const CHART_GRAY = '#8f8f8f';
+  const CHART_GRAY_LIGHT = '#d8d3cd';
+  const CHART_GRID = '#eee9e4';
+  const CHART_TEXT = '#686868';
 
   function drawBarChart(id, labels, series, names){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
-    const pad={l:54,r:28,t:46,b:68};
+    const pad={l:54,r:34,t:50,b:46};
     ctx.clearRect(0,0,W,H);
     const vals=series.flat().map(v=>Number(v||0));
     const max=niceMax(Math.max(...vals,0));
     drawGrid(ctx,W,H,pad,labels,max,id==='chartCash');
     drawLegend(ctx,names,[CHART_ORANGE,CHART_GRAY],W,pad);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
 
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const groupW=plotW/labels.length;
-    const barW=Math.max(10,Math.min(24,(groupW-20)/Math.max(series.length,1)));
+    const barW=Math.max(12,Math.min(30,(groupW-18)/Math.max(series.length,1)));
     const colors=[CHART_ORANGE,CHART_GRAY];
-    const points=[];
     series.forEach((s,si)=>s.forEach((raw,i)=>{
       const v=Number(raw||0); if(v<=0) return;
-      const h=Math.max(5,plotH*(v/max));
+      const h=Math.max(4,plotH*(v/max));
       const center=pad.l+i*groupW+groupW/2;
-      const x=center - (barW*series.length + 7*(series.length-1))/2 + si*(barW+7);
+      const x=center - (barW*series.length + 6*(series.length-1))/2 + si*(barW+6);
       const y=pad.t+plotH-h;
       ctx.fillStyle=colors[si%colors.length];
       roundRect(ctx,x,y,barW,h,8); ctx.fill();
-      const valueText=id==='chartCash'?shortMoney(v):number(v);
-      ctx.fillStyle=colors[si%colors.length];
-      ctx.font='650 10.5px Host Grotesk';
+      ctx.fillStyle=CHART_TEXT;
+      ctx.font='600 12px Host Grotesk';
       ctx.textAlign='center';
-      const valueY=pad.t+plotH+16+(si*15);
-      ctx.fillText(valueText,x+barW/2,valueY);
-      points.push({x,y,w:barW,h,label:`${names[si]} · ${labels[i]}`,value:valueText,raw:v});
+      ctx.fillText(id==='chartCash'?shortMoney(v):number(v),x+barW/2,Math.max(18,y-8));
     }));
-    enableChartTooltip(c,points);
   }
 
   function drawLineChart(id, labels, values, label=''){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
-    const pad={l:58,r:34,t:40,b:48};
+    const pad={l:58,r:40,t:42,b:46};
     ctx.clearRect(0,0,W,H);
     const max=niceMax(Math.max(...values.map(v=>Number(v||0)),0));
     drawGrid(ctx,W,H,pad,labels,max,true);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); enableChartTooltip(c,[]); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); return; }
 
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const step=plotW/Math.max(labels.length-1,1);
     const points=values.map((v,i)=>({
       x:pad.l+i*step,
       y:pad.t+plotH-(plotH*(Number(v||0)/max)),
-      v:Number(v||0),
-      label: labels[i]
+      v:Number(v||0)
     }));
 
     ctx.beginPath();
@@ -1257,79 +1243,70 @@
     ctx.lineTo(points[points.length-1].x,pad.t+plotH);
     ctx.lineTo(points[0].x,pad.t+plotH);
     ctx.closePath();
-    ctx.fillStyle='rgba(195,101,34,.075)';
+    ctx.fillStyle='rgba(195,101,34,.08)';
     ctx.fill();
 
     ctx.strokeStyle=CHART_ORANGE;
-    ctx.lineWidth=2.5;
+    ctx.lineWidth=3;
     ctx.lineJoin='round';
     ctx.lineCap='round';
     ctx.beginPath();
     points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
     ctx.stroke();
 
-    const tooltipPoints=[];
     points.forEach((p,i)=>{
-      const active=p.v>0;
-      ctx.fillStyle=active?'#fff':'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(p.x,p.y,active?5:4,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=active?CHART_ORANGE:CHART_GRAY_LIGHT; ctx.lineWidth=active?2.5:1.5; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle=CHART_ORANGE; ctx.lineWidth=3; ctx.stroke();
       if(i===points.length-1 && p.v>0){
         const txt=shortMoney(p.v);
-        ctx.font='650 11px Host Grotesk';
+        ctx.font='600 12px Host Grotesk';
         ctx.textAlign='right';
         ctx.fillStyle=CHART_TEXT;
         ctx.fillText(txt,Math.min(W-pad.r,p.x+24),Math.max(18,p.y-12));
       }
-      tooltipPoints.push({x:p.x-10,y:p.y-10,w:20,h:20,label:`${label || 'Valore'} · ${p.label}`,value:shortMoney(p.v),raw:p.v});
     });
-    enableChartTooltip(c,tooltipPoints);
   }
 
   function drawSingleBarChart(id, items, label='Valore'){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
-    const pad={l:104,r:34,t:34,b:26};
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
+    const pad={l:116,r:38,t:34,b:30};
     const max=niceMax(Math.max(...items.map(i=>Number(i.value||0)),0));
     const plotW=W-pad.l-pad.r;
-    const rowH=Math.min(32, Math.max(23,(H-pad.t-pad.b)/Math.max(items.length,1)));
+    const rowH=Math.min(34, Math.max(24,(H-pad.t-pad.b)/Math.max(items.length,1)));
     ctx.fillStyle=CHART_TEXT;
     ctx.font='600 12px Host Grotesk';
     ctx.textAlign='left';
     ctx.fillText(label,pad.l,pad.t-12);
-    const tooltipPoints=[];
     items.slice(0,7).forEach((it,i)=>{
       const y=pad.t+i*rowH;
       const value=Number(it.value||0);
       ctx.fillStyle=CHART_TEXT;
-      ctx.font='600 12px Host Grotesk';
+      ctx.font='600 13px Host Grotesk';
       ctx.textAlign='right';
-      ctx.fillText(String(it.label),pad.l-12,y+13);
-      ctx.fillStyle='rgba(27,24,20,.055)';
-      roundRect(ctx,pad.l,y,plotW,13,7); ctx.fill();
+      ctx.fillText(String(it.label),pad.l-14,y+14);
+      ctx.fillStyle='rgba(0,0,0,.06)';
+      roundRect(ctx,pad.l,y,plotW,14,7); ctx.fill();
       ctx.fillStyle=i===0?CHART_ORANGE:CHART_GRAY;
-      const ww=Math.max(6,plotW*(value/max));
-      roundRect(ctx,pad.l,y,ww,13,7); ctx.fill();
-      ctx.fillStyle=CHART_BLACK;
-      ctx.font='700 11px Host Grotesk';
+      roundRect(ctx,pad.l,y,Math.max(6,plotW*(value/max)),14,7); ctx.fill();
+      ctx.fillStyle='#111';
+      ctx.font='700 12px Host Grotesk';
       ctx.textAlign='left';
-      ctx.fillText(number(value),Math.min(pad.l+ww+7,W-44),y+11);
-      tooltipPoints.push({x:pad.l,y,w:ww,h:13,label:String(it.label),value:number(value),raw:value});
+      ctx.fillText(number(value),pad.l+Math.max(10,plotW*(value/max))+8,y+12);
     });
-    enableChartTooltip(c,tooltipPoints);
   }
 
   function drawDonutChart(id,items){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); return; }
     const total=items.reduce((s,i)=>s+Number(i.value||0),0);
     const colors=[CHART_ORANGE, CHART_GRAY, CHART_GRAY_LIGHT, '#b9b2aa', '#eee9e4'];
-    const cx=W*.36, cy=H*.56, r=Math.min(W,H)*.26, width=r*.36;
+    const cx=W*.36, cy=H*.56, r=Math.min(W,H)*.28, width=r*.38;
     let start=-Math.PI/2;
-    const arcs=[];
     items.forEach((it,i)=>{
       const a=(Number(it.value||0)/total)*Math.PI*2;
       ctx.beginPath();
@@ -1338,27 +1315,25 @@
       ctx.strokeStyle=colors[i%colors.length];
       ctx.lineCap='butt';
       ctx.stroke();
-      arcs.push({cx,cy,r,width,start,end:start+a,label:it.label,value:shortMoney(it.value),raw:Number(it.value||0)});
       start+=a;
     });
     ctx.fillStyle=CHART_TEXT;
-    ctx.font='500 11px Host Grotesk';
+    ctx.font='500 12px Host Grotesk';
     ctx.textAlign='center';
     ctx.fillText('Totale',cx,cy-4);
-    ctx.fillStyle=CHART_BLACK;
-    ctx.font='700 15px Host Grotesk';
+    ctx.fillStyle='#111';
+    ctx.font='700 16px Host Grotesk';
     ctx.fillText(shortMoney(total),cx,cy+18);
 
     ctx.textAlign='left';
     items.slice(0,5).forEach((it,i)=>{
-      const y=38+i*25;
+      const y=42+i*28;
       ctx.fillStyle=colors[i%colors.length];
-      roundRect(ctx,W*.58,y-10,11,11,3); ctx.fill();
-      ctx.fillStyle=CHART_BLACK;
-      ctx.font='600 12px Host Grotesk';
-      ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+20,y);
+      roundRect(ctx,W*.58,y-10,12,12,3); ctx.fill();
+      ctx.fillStyle='#111';
+      ctx.font='600 13px Host Grotesk';
+      ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+22,y);
     });
-    enableDonutTooltip(c,arcs);
   }
 
   function drawEmptyChart(ctx,W,H,message){
@@ -1383,7 +1358,7 @@
   function drawGrid(ctx,W,H,pad,labels,max,isMoney=false){
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     ctx.strokeStyle=CHART_GRID; ctx.lineWidth=1;
-    ctx.fillStyle=CHART_TEXT; ctx.font='500 11px Host Grotesk';
+    ctx.fillStyle=CHART_TEXT; ctx.font='500 12px Host Grotesk';
     ctx.textAlign='right';
     for(let i=0;i<4;i++){
       const y=pad.t+i*(plotH/3);
@@ -1393,76 +1368,20 @@
     ctx.textAlign='center';
     labels.forEach((l,i)=>{
       const x=pad.l+i*(plotW/Math.max(labels.length-1,1));
-      ctx.fillStyle=CHART_TEXT;
-      ctx.fillText(l,x,H-pad.b+48);
+      ctx.fillText(l,x,pad.t+plotH+28);
     });
   }
   function drawLegend(ctx,names,colors,W,pad){
+    ctx.font='600 12px Host Grotesk';
     ctx.textAlign='left';
+    const startX=Math.max(pad.l,W-pad.r-150);
     names.forEach((n,i)=>{
-      const x=W-pad.r-112, y=20+i*18;
-      ctx.fillStyle=colors[i]; roundRect(ctx,x,y-9,9,9,2); ctx.fill();
-      ctx.fillStyle=CHART_TEXT; ctx.font='600 11px Host Grotesk'; ctx.fillText(n,x+14,y);
+      const y=22+i*18;
+      ctx.fillStyle=colors[i%colors.length]; roundRect(ctx,startX,y-9,10,10,2); ctx.fill();
+      ctx.fillStyle=CHART_TEXT; ctx.fillText(n,startX+16,y);
     });
   }
-  function chartTooltipEl(){
-    let el=document.getElementById('chartTooltip');
-    if(!el){
-      el=document.createElement('div');
-      el.id='chartTooltip';
-      el.style.position='fixed';
-      el.style.zIndex='9999';
-      el.style.pointerEvents='none';
-      el.style.padding='8px 10px';
-      el.style.borderRadius='12px';
-      el.style.background='rgba(255,255,255,.86)';
-      el.style.border='1px solid rgba(0,0,0,.08)';
-      el.style.boxShadow='0 14px 35px rgba(0,0,0,.14)';
-      el.style.backdropFilter='blur(16px)';
-      el.style.webkitBackdropFilter='blur(16px)';
-      el.style.font='600 12px Host Grotesk';
-      el.style.color='#141414';
-      el.style.display='none';
-      document.body.appendChild(el);
-    }
-    return el;
-  }
-  function showChartTooltip(ev,item){
-    const el=chartTooltipEl();
-    el.innerHTML=`<div style="color:#6a6761;font-weight:600;margin-bottom:3px">${esc(item.label||'')}</div><div style="font-size:14px;font-weight:750">${esc(item.value||'')}</div>`;
-    el.style.left=Math.min(window.innerWidth-190,ev.clientX+14)+'px';
-    el.style.top=Math.max(12,ev.clientY-14)+'px';
-    el.style.display='block';
-  }
-  function hideChartTooltip(){ const el=document.getElementById('chartTooltip'); if(el) el.style.display='none'; }
-  function enableChartTooltip(c,items){
-    c.onmousemove=ev=>{
-      const rect=c.getBoundingClientRect();
-      const sx=c.width/rect.width, sy=c.height/rect.height;
-      const x=(ev.clientX-rect.left)*sx, y=(ev.clientY-rect.top)*sy;
-      const hit=items.find(it=>x>=it.x-6 && x<=it.x+it.w+6 && y>=it.y-8 && y<=it.y+it.h+8);
-      c.style.cursor=hit?'pointer':'default';
-      if(hit) showChartTooltip(ev,hit); else hideChartTooltip();
-    };
-    c.onmouseleave=()=>{ c.style.cursor='default'; hideChartTooltip(); };
-  }
-  function enableDonutTooltip(c,arcs){
-    c.onmousemove=ev=>{
-      const rect=c.getBoundingClientRect();
-      const sx=c.width/rect.width, sy=c.height/rect.height;
-      const x=(ev.clientX-rect.left)*sx, y=(ev.clientY-rect.top)*sy;
-      const hit=arcs.find(a=>{
-        const dx=x-a.cx, dy=y-a.cy, dist=Math.sqrt(dx*dx+dy*dy);
-        if(dist<a.r-a.width/2 || dist>a.r+a.width/2) return false;
-        let ang=Math.atan2(dy,dx); if(ang < -Math.PI/2) ang+=Math.PI*2;
-        let st=a.start, en=a.end; if(st < -Math.PI/2) st+=Math.PI*2; if(en < st) en+=Math.PI*2;
-        return ang>=st && ang<=en;
-      });
-      c.style.cursor=hit?'pointer':'default';
-      if(hit) showChartTooltip(ev,hit); else hideChartTooltip();
-    };
-    c.onmouseleave=()=>{ c.style.cursor='default'; hideChartTooltip(); };
-  }
+  function shortMoney(v){ return money(v).replace(',00',''); }
   function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
 
   const SIDEBAR_KEY = 'ambiguo_sidebar_collapsed';
