@@ -123,6 +123,12 @@
     return {wines,bottles,netValue,grossValue,resaleValue,potentialValue:resaleValue+salesGross,ordersGross,salesGross,movementsIn,movementsOut,orders:state.orders.length,sales:state.sales.length,customers:state.customers.length};
   }
 
+  function monthKeyFromDate(value){
+    const d=new Date(value || todayISO());
+    if(Number.isNaN(d.getTime())) return String(value||'').slice(0,7);
+    return d.toISOString().slice(0,7);
+  }
+
   function monthlyData(){
     const months=[]; const now=new Date();
     for(let i=5;i>=0;i--){
@@ -131,8 +137,33 @@
       const key=d.toISOString().slice(0,7);
       months.push({key,label:d.toLocaleDateString('it-IT',{month:'short'}),end,spent:0,sales:0,inQty:0,outQty:0,value:0});
     }
-    state.orders.forEach(o=>{ const b=months.find(m=>m.key===String(o.date||'').slice(0,7)); if(b){ b.spent+=Number(o.totals?.grossTotal||0); b.inQty+=Number(o.totals?.quantity||0); }});
-    state.sales.filter(s=>s.status!=='annullato').forEach(s=>{ const b=months.find(m=>m.key===String(s.date||'').slice(0,7)); if(b){ b.sales+=Number(s.totals?.total||0); b.outQty+=Number(s.totals?.quantity||0); }});
+
+    // Entrate/uscite economiche: ordini distributori e ordini clienti.
+    state.orders.forEach(o=>{
+      const b=months.find(m=>m.key===monthKeyFromDate(o.date || o.createdAt));
+      if(b) b.spent+=Number(o.totals?.grossTotal || calculateOrderTotals(o.lines||[]).grossTotal || 0);
+    });
+    state.sales.filter(s=>s.status!=='annullato').forEach(s=>{
+      const b=months.find(m=>m.key===monthKeyFromDate(s.date || s.createdAt));
+      if(b) b.sales+=Number(s.totals?.total || calculateSaleTotals(s.lines||[]).total || 0);
+    });
+
+    // Entrate/uscite bottiglie: movimenti reali, così funziona anche con inserimenti manuali o rettifiche.
+    state.movements.forEach(move=>{
+      const b=months.find(m=>m.key===monthKeyFromDate(move.date || move.createdAt));
+      if(!b) return;
+      const q=Number(move.quantityChange||0);
+      if(q>0) b.inQty+=q;
+      if(q<0) b.outQty+=Math.abs(q);
+    });
+
+    // Fallback robusto: per dati vecchi senza movimenti, usa quantità ordini/vendite.
+    const hasMovementsInMonths=months.some(m=>m.inQty>0 || m.outQty>0);
+    if(!hasMovementsInMonths){
+      state.orders.forEach(o=>{ const b=months.find(m=>m.key===monthKeyFromDate(o.date || o.createdAt)); if(b) b.inQty+=Number(o.totals?.quantity || calculateOrderTotals(o.lines||[]).quantity || 0); });
+      state.sales.filter(s=>s.status!=='annullato').forEach(s=>{ const b=months.find(m=>m.key===monthKeyFromDate(s.date || s.createdAt)); if(b) b.outQty+=Number(s.totals?.quantity || calculateSaleTotals(s.lines||[]).quantity || 0); });
+    }
+
     months.forEach(m=>{
       const qtyByWine={};
       state.movements.forEach(move=>{
@@ -143,7 +174,17 @@
     });
     return months;
   }
-  function distributorBreakdown(){ const items=activeDistributors().map(d=>({label:d.name,value:0})); state.orders.forEach(o=>{ const it=items.find(x=>x.label===distributorName(o.distributorId)); if(it) it.value+=Number(o.totals?.grossTotal||0); }); return items.filter(i=>i.value>0); }
+  function distributorBreakdown(){ const items=activeDistributors().map(d=>({label:d.name,value:0})); state.orders.forEach(o=>{ const it=items.find(x=>x.label===distributorName(o.distributorId)); if(it) it.value+=Number(o.totals?.grossTotal || calculateOrderTotals(o.lines||[]).grossTotal || 0); }); return items.filter(i=>i.value>0); }
+  function tagQuantityBreakdown(){
+    const map={};
+    state.wines.filter(w=>!w.archived && Number(w.quantity||0)>0).forEach(w=>{ const tag=w.tag||'senza tag'; map[tag]=(map[tag]||0)+Number(w.quantity||0); });
+    return Object.entries(map).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+  }
+  function tagValueBreakdown(){
+    const map={};
+    state.wines.filter(w=>!w.archived && Number(w.quantity||0)>0).forEach(w=>{ const tag=w.tag||'senza tag'; map[tag]=(map[tag]||0)+Number(w.resalePrice||0)*Number(w.quantity||0); });
+    return Object.entries(map).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
+  }
 
   function render(){
     if (!views[currentView]) currentView = 'dashboard';
@@ -173,11 +214,15 @@
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
       <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap"><canvas id="chartInventory"></canvas></div></div><div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap"><canvas id="chartBottles"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>`;
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>
+      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div><div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div></div>`;
     drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
     drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
-    drawDonutChart('chartDistributor',distributorBreakdown()); bindInlineActions();
+    drawDonutChart('chartDistributor',distributorBreakdown());
+    drawSingleBarChart('chartTagQty',tagQuantityBreakdown(),'Bottiglie');
+    drawDonutChart('chartTagValue',tagValueBreakdown());
+    bindInlineActions();
   }
   function notificationRows(){
     const unpaidOrders=state.orders.filter(o=>(o.paymentStatus||'da pagare')!=='pagato' && o.status!=='annullato');
@@ -432,7 +477,7 @@
   function openMovementModal(){ openModal({title:'Movimento manuale',subtitle:'Ogni modifica quantità viene tracciata nello storico.',body:`<div class="form-grid">${field('Vino','wineId','', 'selectPairs', state.wines.map(w=>[w.id,`${w.code} — ${w.name} (${w.quantity} disp.)`]))}${field('Tipo movimento','type','scarico manuale','select',['carico manuale','scarico manuale','bottiglia degustata','omaggio','bottiglia danneggiata','rettifica inventario','prelievo personale','reso'])}${field('Quantità','quantity',1,'number')}${field('Data','date',todayISO(),'date')}<div class="field" style="grid-column:1/-1"><label>Motivo / nota</label><textarea id="f_note"></textarea></div></div>`,primary:'Registra movimento',onPrimary:()=>{ const wine=getWine(val('wineId')); if(!wine) return toast('Seleziona un vino.'); const qty=Math.abs(intQty(val('quantity'))); if(!qty) return toast('Inserisci una quantità valida.'); const type=val('type'), positive=['carico manuale','reso'].includes(type), delta=positive?qty:-qty; if(!state.settings.allowNegativeStock&&Number(wine.quantity||0)+delta<0) return toast('Stock insufficiente.'); wine.quantity=Number(wine.quantity||0)+delta; addMovement(wine.id,delta,type,val('date'),val('note')); save(); closeModal(); toast('Movimento registrato.'); render(); }}); }
   function addMovement(wineId,quantityChange,type,date,note,sourceType='manuale',sourceId=''){ state.movements.push({id:S.uuid(),wineId,quantityChange:Number(quantityChange),type,date:date||todayISO(),note:note||'',sourceType,sourceId,createdAt:S.now()}); }
 
-  function openOrderModal(id, duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.orders.find(o=>o.id===id):null; const order=old?JSON.parse(JSON.stringify(old)):null; const initialLines=order?.lines?.length?order.lines:[emptyOrderLine()]; openModal({title:isEdit?'Modifica ordine distributore':duplicate?'Duplica ordine distributore':'Nuovo ordine distributore',subtitle:'Inserisci prima la data. Non devi scegliere nessun numero ordine: viene creato un codice interno automatico.',body:`<div class="form-grid order-meta-grid">${field('Data ordine','orderDate',order?.date||todayISO(),'date')}<div class="field"><label>Distributore</label><div style="display:flex; gap:8px"><select id="f_orderDistributor">${activeDistributors().map(d=>`<option value="${d.id}" ${order?.distributorId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select><button class="btn secondary" id="addDistributorInOrder" type="button">+</button></div></div>${field('Sconto ordine proposto','orderDiscountPreset',order?.discountPreset||distributorDefaultDiscount(order?.distributorId||activeDistributors()[0]?.id)||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Cliente associato, opzionale</label><div style="display:flex; gap:8px"><select id="f_orderCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${order?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInOrder" type="button">+</button></div></div>${field('Stato','orderStatus',order?.status||'ricevuto','select',['bozza','ricevuto'])}${field('Pagamento','orderPaymentStatus',order?.paymentStatus||'da pagare','select',['da pagare','pagato'])}</div><div class="section-head"><h2>Referenze</h2><button class="btn secondary" id="addOrderLineBtn" type="button">Aggiungi riga</button></div><div id="orderLines"></div><div class="summary-box" id="orderTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_orderNotes">${esc(order?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine',onPrimary:()=>saveOrderFromModal(isEdit?old:null)}); window.__orderLines=initialLines.map(l=>({...emptyOrderLine(),...l})); if(!old){ const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset})); } renderOrderLines(); document.getElementById('addOrderLineBtn').addEventListener('click',()=>{ window.__orderLines.push(emptyOrderLine()); renderOrderLines(); }); document.getElementById('f_orderDistributor').addEventListener('change',()=>{ const preset=distributorDefaultDiscount(val('orderDistributor')); const discountField=document.getElementById('f_orderDiscountPreset'); if(discountField && !isEdit) discountField.value=preset||'none'; }); document.getElementById('f_orderDiscountPreset')?.addEventListener('change',()=>{ syncOrderLinesFromDom(); const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset,discount1:0,discount2:0,discount3:0})); renderOrderLines(); }); document.getElementById('addDistributorInOrder').addEventListener('click',()=>quickAddDistributor((id,name)=>{ const select=document.getElementById('f_orderDistributor'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; const df=document.getElementById('f_orderDiscountPreset'); if(df) df.value=distributorDefaultDiscount(id)||'none'; })); document.getElementById('addCustomerInOrder').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_orderCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
+  function openOrderModal(id, duplicate=false){ const isEdit=Boolean(id)&&!duplicate; const old=id?state.orders.find(o=>o.id===id):null; const order=old?JSON.parse(JSON.stringify(old)):null; const initialLines=order?.lines?.length?order.lines:[emptyOrderLine()]; openModal({title:isEdit?'Modifica ordine distributore':duplicate?'Duplica ordine distributore':'Nuovo ordine distributore',subtitle:'Inserisci prima la data. Non devi scegliere nessun numero ordine: viene creato un codice interno automatico.',body:`<div class="form-grid order-meta-grid">${field('Data ordine','orderDate',order?.date||todayISO(),'date')}<div class="field"><label>Distributore</label><div style="display:flex; gap:8px"><select id="f_orderDistributor">${activeDistributors().map(d=>`<option value="${d.id}" ${order?.distributorId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select><button class="btn secondary" id="addDistributorInOrder" type="button">+</button></div></div>${field('Sconto ordine proposto','orderDiscountPreset',order?.discountPreset||distributorDefaultDiscount(order?.distributorId||activeDistributors()[0]?.id)||'none','selectPairs',DISCOUNT_PRESETS)}<div class="field"><label>Cliente associato, opzionale</label><div style="display:flex; gap:8px"><select id="f_orderCustomer"><option value="">Nessun cliente</option>${activeCustomers().map(c=>`<option value="${c.id}" ${order?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="btn secondary" id="addCustomerInOrder" type="button">+</button></div></div>${field('Stato','orderStatus',order?.status||'ricevuto','select',['bozza','ricevuto'])}${field('Pagamento','orderPaymentStatus',order?.paymentStatus||'da pagare','select',['da pagare','pagato'])}</div><div class="section-head"><h2>Referenze</h2><button class="btn secondary" id="addOrderLineBtn" type="button">Aggiungi riga</button></div><div id="orderLines"></div><div class="modal-inline-actions bottom-add-row"><button class="btn secondary" id="addOrderLineBottomBtn" type="button">Aggiungi vino</button></div><div class="summary-box" id="orderTotals" style="margin-top:16px"></div><div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_orderNotes">${esc(order?.notes||'')}</textarea></div>`,primary:isEdit?'Salva modifiche':'Salva ordine',onPrimary:()=>saveOrderFromModal(isEdit?old:null)}); window.__orderLines=initialLines.map(l=>({...emptyOrderLine(),...l})); if(!old){ const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset})); } renderOrderLines(); document.getElementById('addOrderLineBtn').addEventListener('click',()=>{ window.__orderLines.push(emptyOrderLine()); renderOrderLines(); }); document.getElementById('addOrderLineBottomBtn')?.addEventListener('click',()=>{ syncOrderLinesFromDom(); window.__orderLines.push(emptyOrderLine()); renderOrderLines(); setTimeout(()=>document.querySelector('#orderLines .order-line-card:last-child input, #orderLines .order-line-card:last-child select')?.focus(),0); }); document.getElementById('f_orderDistributor').addEventListener('change',()=>{ const preset=distributorDefaultDiscount(val('orderDistributor')); const discountField=document.getElementById('f_orderDiscountPreset'); if(discountField && !isEdit) discountField.value=preset||'none'; }); document.getElementById('f_orderDiscountPreset')?.addEventListener('change',()=>{ syncOrderLinesFromDom(); const preset=val('orderDiscountPreset')||'none'; window.__orderLines=window.__orderLines.map(l=>({...l,discountPreset:preset,discount1:0,discount2:0,discount3:0})); renderOrderLines(); }); document.getElementById('addDistributorInOrder').addEventListener('click',()=>quickAddDistributor((id,name)=>{ const select=document.getElementById('f_orderDistributor'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; const df=document.getElementById('f_orderDiscountPreset'); if(df) df.value=distributorDefaultDiscount(id)||'none'; })); document.getElementById('addCustomerInOrder').addEventListener('click',()=>quickAddCustomer((id,name)=>{ const select=document.getElementById('f_orderCustomer'); select.insertAdjacentHTML('beforeend',`<option value="${id}">${esc(name)}</option>`); select.value=id; })); bindFormEnhancements(); }
   function emptyOrderLine(){ return {code:'',name:'',producer:'',vintage:'',size:'0.75',tag:'bianco',netUnitPrice:0,discountPreset:val('orderDiscountPreset')||'none',discount1:0,discount2:0,discount3:0,resalePrice:0,quantity:1,vatRate:state.settings.vatRate}; }
   function renderOrderLines(){ const root=document.getElementById('orderLines'); root.innerHTML=window.__orderLines.map((l,i)=>`<div class="order-line" data-index="${i}"><div class="line-head"><strong>Vino ${i+1}</strong><div class="actions"><button class="btn small ghost" data-line-action="duplicate" data-index="${i}">Duplica</button><button class="btn small secondary" data-line-action="remove" data-index="${i}">Elimina</button></div></div><div class="order-line-grid">${field('Codice',`l_${i}_code`,l.code,'text')}${field('Nome vino',`l_${i}_name`,l.name,'text')}${field('Cantina',`l_${i}_producer`,l.producer,'text')}${field('Annata',`l_${i}_vintage`,l.vintage,'text')}${field('Dimensione',`l_${i}_size`,l.size,'select',['0.75','1.5l','1l','magnum','altro'])}${field('Tag',`l_${i}_tag`,l.tag,'select',TAGS)}${field('Listino no IVA',`l_${i}_netUnitPrice`,l.netUnitPrice,'number')}${field('Sconto',`l_${i}_discountPreset`,l.discountPreset||'none','selectPairs',DISCOUNT_PRESETS)}${field('Manuale 1 %',`l_${i}_discount1`,l.discount1||0,'number')}${field('Manuale 2 %',`l_${i}_discount2`,l.discount2||0,'number')}${field('Manuale 3 %',`l_${i}_discount3`,l.discount3||0,'number')}${field('Resell Ambiguo',`l_${i}_resalePrice`,l.resalePrice||0,'number')}${field('Quantità',`l_${i}_quantity`,l.quantity,'number')}${field('IVA %',`l_${i}_vatRate`,l.vatRate,'number')}</div><div class="summary-box line-summary soft-summary" id="line_total_${i}"></div></div>`).join(''); root.querySelectorAll('[data-line-action]').forEach(btn=>btn.addEventListener('click',()=>{ syncOrderLinesFromDom(); const i=Number(btn.dataset.index); if(btn.dataset.lineAction==='remove'&&window.__orderLines.length>1) window.__orderLines.splice(i,1); if(btn.dataset.lineAction==='duplicate'){ const copy={...window.__orderLines[i],id:S.uuid(),sourceWineId:'',sourceOrderLineId:S.uuid()}; window.__orderLines.splice(i+1,0,copy); } renderOrderLines(); })); root.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{ syncOrderLinesFromDom(); updateOrderTotals(); })); updateOrderTotals(); }
   function syncOrderLinesFromDom(){ window.__orderLines=window.__orderLines.map((l,i)=>({id:l.id,sourceWineId:l.sourceWineId||'',sourceOrderLineId:l.sourceOrderLineId||l.id||'',manualStock:Boolean(l.manualStock),code:val(`l_${i}_code`),name:val(`l_${i}_name`),producer:val(`l_${i}_producer`),vintage:val(`l_${i}_vintage`),size:val(`l_${i}_size`),tag:val(`l_${i}_tag`),netUnitPrice:parseAmount(val(`l_${i}_netUnitPrice`)),discountPreset:val(`l_${i}_discountPreset`)||'none',discount1:parseAmount(val(`l_${i}_discount1`)),discount2:parseAmount(val(`l_${i}_discount2`)),discount3:parseAmount(val(`l_${i}_discount3`)),resalePrice:parseAmount(val(`l_${i}_resalePrice`)),quantity:intQty(val(`l_${i}_quantity`)),vatRate:parseAmount(val(`l_${i}_vatRate`)||state.settings.vatRate)})); }
@@ -1112,6 +1157,37 @@
         ctx.fillStyle=CHART_TEXT;
         ctx.fillText(txt,Math.min(W-pad.r,p.x+24),Math.max(18,p.y-12));
       }
+    });
+  }
+
+  function drawSingleBarChart(id, items, label='Valore'){
+    const c=document.getElementById(id); if(!c)return; setupCanvas(c);
+    const ctx=c.getContext('2d'), W=c.width, H=c.height;
+    ctx.clearRect(0,0,W,H);
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
+    const pad={l:116,r:38,t:34,b:30};
+    const max=niceMax(Math.max(...items.map(i=>Number(i.value||0)),0));
+    const plotW=W-pad.l-pad.r;
+    const rowH=Math.min(34, Math.max(24,(H-pad.t-pad.b)/Math.max(items.length,1)));
+    ctx.fillStyle=CHART_TEXT;
+    ctx.font='600 12px Host Grotesk';
+    ctx.textAlign='left';
+    ctx.fillText(label,pad.l,pad.t-12);
+    items.slice(0,7).forEach((it,i)=>{
+      const y=pad.t+i*rowH;
+      const value=Number(it.value||0);
+      ctx.fillStyle=CHART_TEXT;
+      ctx.font='600 13px Host Grotesk';
+      ctx.textAlign='right';
+      ctx.fillText(String(it.label),pad.l-14,y+14);
+      ctx.fillStyle='rgba(0,0,0,.06)';
+      roundRect(ctx,pad.l,y,plotW,14,7); ctx.fill();
+      ctx.fillStyle=i===0?CHART_ORANGE:CHART_GRAY;
+      roundRect(ctx,pad.l,y,Math.max(6,plotW*(value/max)),14,7); ctx.fill();
+      ctx.fillStyle='#111';
+      ctx.font='700 12px Host Grotesk';
+      ctx.textAlign='left';
+      ctx.fillText(number(value),pad.l+Math.max(10,plotW*(value/max))+8,y+12);
     });
   }
 
