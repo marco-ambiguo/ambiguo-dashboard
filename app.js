@@ -274,9 +274,16 @@
         ${statCard('Incassato',money(st.salesGross),'Ordini clienti')}
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap"><canvas id="chartInventory"></canvas></div></div><div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap"><canvas id="chartBottles"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div><div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div></div>`;
+      <div class="grid three dashboard-charts">
+        <div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap small"><canvas id="chartInventory"></canvas></div></div>
+        <div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap small"><canvas id="chartBottles"></canvas></div></div>
+        <div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div>
+      </div>
+      <div class="grid three dashboard-charts">
+        <div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div>
+        <div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div>
+        <div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div>
+      </div>`;
     drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
     drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
@@ -1186,56 +1193,63 @@
   function resetAll(){ if(!confirm('Prima conferma: vuoi cancellare tutti i dati?')) return; if(!confirm('Seconda conferma: questa azione non si può annullare.')) return; state=S.reset(); toast('Dati cancellati.'); render(); }
 
   const CHART_ORANGE = '#c36522';
-  const CHART_GRAY = '#8f8f8f';
-  const CHART_GRAY_LIGHT = '#d8d3cd';
-  const CHART_GRID = '#eee9e4';
-  const CHART_TEXT = '#686868';
+  const CHART_GRAY = '#9b9892';
+  const CHART_GRAY_LIGHT = '#d7d2cb';
+  const CHART_GRID = 'rgba(32,28,24,.075)';
+  const CHART_TEXT = '#5f5b55';
+  const CHART_BLACK = '#171717';
 
   function drawBarChart(id, labels, series, names){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
-    const pad={l:54,r:34,t:50,b:46};
+    const pad={l:54,r:28,t:46,b:68};
     ctx.clearRect(0,0,W,H);
     const vals=series.flat().map(v=>Number(v||0));
     const max=niceMax(Math.max(...vals,0));
     drawGrid(ctx,W,H,pad,labels,max,id==='chartCash');
     drawLegend(ctx,names,[CHART_ORANGE,CHART_GRAY],W,pad);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
 
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const groupW=plotW/labels.length;
-    const barW=Math.max(12,Math.min(30,(groupW-18)/Math.max(series.length,1)));
+    const barW=Math.max(10,Math.min(24,(groupW-20)/Math.max(series.length,1)));
     const colors=[CHART_ORANGE,CHART_GRAY];
+    const points=[];
     series.forEach((s,si)=>s.forEach((raw,i)=>{
       const v=Number(raw||0); if(v<=0) return;
-      const h=Math.max(4,plotH*(v/max));
+      const h=Math.max(5,plotH*(v/max));
       const center=pad.l+i*groupW+groupW/2;
-      const x=center - (barW*series.length + 6*(series.length-1))/2 + si*(barW+6);
+      const x=center - (barW*series.length + 7*(series.length-1))/2 + si*(barW+7);
       const y=pad.t+plotH-h;
       ctx.fillStyle=colors[si%colors.length];
       roundRect(ctx,x,y,barW,h,8); ctx.fill();
-      ctx.fillStyle=CHART_TEXT;
-      ctx.font='600 12px Host Grotesk';
+      const valueText=id==='chartCash'?shortMoney(v):number(v);
+      ctx.fillStyle=colors[si%colors.length];
+      ctx.font='650 10.5px Host Grotesk';
       ctx.textAlign='center';
-      ctx.fillText(id==='chartCash'?shortMoney(v):number(v),x+barW/2,Math.max(18,y-8));
+      const valueY=pad.t+plotH+16+(si*15);
+      ctx.fillText(valueText,x+barW/2,valueY);
+      points.push({x,y,w:barW,h,label:`${names[si]} · ${labels[i]}`,value:valueText,raw:v});
     }));
+    enableChartTooltip(c,points);
   }
 
   function drawLineChart(id, labels, values, label=''){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
-    const pad={l:58,r:40,t:42,b:46};
+    const pad={l:58,r:34,t:40,b:48};
     ctx.clearRect(0,0,W,H);
     const max=niceMax(Math.max(...values.map(v=>Number(v||0)),0));
     drawGrid(ctx,W,H,pad,labels,max,true);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); enableChartTooltip(c,[]); return; }
 
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const step=plotW/Math.max(labels.length-1,1);
     const points=values.map((v,i)=>({
       x:pad.l+i*step,
       y:pad.t+plotH-(plotH*(Number(v||0)/max)),
-      v:Number(v||0)
+      v:Number(v||0),
+      label: labels[i]
     }));
 
     ctx.beginPath();
@@ -1243,70 +1257,79 @@
     ctx.lineTo(points[points.length-1].x,pad.t+plotH);
     ctx.lineTo(points[0].x,pad.t+plotH);
     ctx.closePath();
-    ctx.fillStyle='rgba(195,101,34,.08)';
+    ctx.fillStyle='rgba(195,101,34,.075)';
     ctx.fill();
 
     ctx.strokeStyle=CHART_ORANGE;
-    ctx.lineWidth=3;
+    ctx.lineWidth=2.5;
     ctx.lineJoin='round';
     ctx.lineCap='round';
     ctx.beginPath();
     points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
     ctx.stroke();
 
+    const tooltipPoints=[];
     points.forEach((p,i)=>{
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=CHART_ORANGE; ctx.lineWidth=3; ctx.stroke();
+      const active=p.v>0;
+      ctx.fillStyle=active?'#fff':'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(p.x,p.y,active?5:4,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle=active?CHART_ORANGE:CHART_GRAY_LIGHT; ctx.lineWidth=active?2.5:1.5; ctx.stroke();
       if(i===points.length-1 && p.v>0){
         const txt=shortMoney(p.v);
-        ctx.font='600 12px Host Grotesk';
+        ctx.font='650 11px Host Grotesk';
         ctx.textAlign='right';
         ctx.fillStyle=CHART_TEXT;
         ctx.fillText(txt,Math.min(W-pad.r,p.x+24),Math.max(18,p.y-12));
       }
+      tooltipPoints.push({x:p.x-10,y:p.y-10,w:20,h:20,label:`${label || 'Valore'} · ${p.label}`,value:shortMoney(p.v),raw:p.v});
     });
+    enableChartTooltip(c,tooltipPoints);
   }
 
   function drawSingleBarChart(id, items, label='Valore'){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
-    const pad={l:116,r:38,t:34,b:30};
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
+    const pad={l:104,r:34,t:34,b:26};
     const max=niceMax(Math.max(...items.map(i=>Number(i.value||0)),0));
     const plotW=W-pad.l-pad.r;
-    const rowH=Math.min(34, Math.max(24,(H-pad.t-pad.b)/Math.max(items.length,1)));
+    const rowH=Math.min(32, Math.max(23,(H-pad.t-pad.b)/Math.max(items.length,1)));
     ctx.fillStyle=CHART_TEXT;
     ctx.font='600 12px Host Grotesk';
     ctx.textAlign='left';
     ctx.fillText(label,pad.l,pad.t-12);
+    const tooltipPoints=[];
     items.slice(0,7).forEach((it,i)=>{
       const y=pad.t+i*rowH;
       const value=Number(it.value||0);
       ctx.fillStyle=CHART_TEXT;
-      ctx.font='600 13px Host Grotesk';
+      ctx.font='600 12px Host Grotesk';
       ctx.textAlign='right';
-      ctx.fillText(String(it.label),pad.l-14,y+14);
-      ctx.fillStyle='rgba(0,0,0,.06)';
-      roundRect(ctx,pad.l,y,plotW,14,7); ctx.fill();
+      ctx.fillText(String(it.label),pad.l-12,y+13);
+      ctx.fillStyle='rgba(27,24,20,.055)';
+      roundRect(ctx,pad.l,y,plotW,13,7); ctx.fill();
       ctx.fillStyle=i===0?CHART_ORANGE:CHART_GRAY;
-      roundRect(ctx,pad.l,y,Math.max(6,plotW*(value/max)),14,7); ctx.fill();
-      ctx.fillStyle='#111';
-      ctx.font='700 12px Host Grotesk';
+      const ww=Math.max(6,plotW*(value/max));
+      roundRect(ctx,pad.l,y,ww,13,7); ctx.fill();
+      ctx.fillStyle=CHART_BLACK;
+      ctx.font='700 11px Host Grotesk';
       ctx.textAlign='left';
-      ctx.fillText(number(value),pad.l+Math.max(10,plotW*(value/max))+8,y+12);
+      ctx.fillText(number(value),Math.min(pad.l+ww+7,W-44),y+11);
+      tooltipPoints.push({x:pad.l,y,w:ww,h:13,label:String(it.label),value:number(value),raw:value});
     });
+    enableChartTooltip(c,tooltipPoints);
   }
 
   function drawDonutChart(id,items){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c.width, H=c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); return; }
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); enableChartTooltip(c,[]); return; }
     const total=items.reduce((s,i)=>s+Number(i.value||0),0);
     const colors=[CHART_ORANGE, CHART_GRAY, CHART_GRAY_LIGHT, '#b9b2aa', '#eee9e4'];
-    const cx=W*.36, cy=H*.56, r=Math.min(W,H)*.28, width=r*.38;
+    const cx=W*.36, cy=H*.56, r=Math.min(W,H)*.26, width=r*.36;
     let start=-Math.PI/2;
+    const arcs=[];
     items.forEach((it,i)=>{
       const a=(Number(it.value||0)/total)*Math.PI*2;
       ctx.beginPath();
@@ -1315,25 +1338,27 @@
       ctx.strokeStyle=colors[i%colors.length];
       ctx.lineCap='butt';
       ctx.stroke();
+      arcs.push({cx,cy,r,width,start,end:start+a,label:it.label,value:shortMoney(it.value),raw:Number(it.value||0)});
       start+=a;
     });
     ctx.fillStyle=CHART_TEXT;
-    ctx.font='500 12px Host Grotesk';
+    ctx.font='500 11px Host Grotesk';
     ctx.textAlign='center';
     ctx.fillText('Totale',cx,cy-4);
-    ctx.fillStyle='#111';
-    ctx.font='700 16px Host Grotesk';
+    ctx.fillStyle=CHART_BLACK;
+    ctx.font='700 15px Host Grotesk';
     ctx.fillText(shortMoney(total),cx,cy+18);
 
     ctx.textAlign='left';
     items.slice(0,5).forEach((it,i)=>{
-      const y=42+i*28;
+      const y=38+i*25;
       ctx.fillStyle=colors[i%colors.length];
-      roundRect(ctx,W*.58,y-10,12,12,3); ctx.fill();
-      ctx.fillStyle='#111';
-      ctx.font='600 13px Host Grotesk';
-      ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+22,y);
+      roundRect(ctx,W*.58,y-10,11,11,3); ctx.fill();
+      ctx.fillStyle=CHART_BLACK;
+      ctx.font='600 12px Host Grotesk';
+      ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+20,y);
     });
+    enableDonutTooltip(c,arcs);
   }
 
   function drawEmptyChart(ctx,W,H,message){
@@ -1358,7 +1383,7 @@
   function drawGrid(ctx,W,H,pad,labels,max,isMoney=false){
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     ctx.strokeStyle=CHART_GRID; ctx.lineWidth=1;
-    ctx.fillStyle=CHART_TEXT; ctx.font='500 12px Host Grotesk';
+    ctx.fillStyle=CHART_TEXT; ctx.font='500 11px Host Grotesk';
     ctx.textAlign='right';
     for(let i=0;i<4;i++){
       const y=pad.t+i*(plotH/3);
@@ -1368,20 +1393,76 @@
     ctx.textAlign='center';
     labels.forEach((l,i)=>{
       const x=pad.l+i*(plotW/Math.max(labels.length-1,1));
-      ctx.fillText(l,x,pad.t+plotH+28);
+      ctx.fillStyle=CHART_TEXT;
+      ctx.fillText(l,x,H-pad.b+48);
     });
   }
   function drawLegend(ctx,names,colors,W,pad){
-    ctx.font='600 12px Host Grotesk';
     ctx.textAlign='left';
-    const startX=Math.max(pad.l,W-pad.r-150);
     names.forEach((n,i)=>{
-      const y=22+i*18;
-      ctx.fillStyle=colors[i%colors.length]; roundRect(ctx,startX,y-9,10,10,2); ctx.fill();
-      ctx.fillStyle=CHART_TEXT; ctx.fillText(n,startX+16,y);
+      const x=W-pad.r-112, y=20+i*18;
+      ctx.fillStyle=colors[i]; roundRect(ctx,x,y-9,9,9,2); ctx.fill();
+      ctx.fillStyle=CHART_TEXT; ctx.font='600 11px Host Grotesk'; ctx.fillText(n,x+14,y);
     });
   }
-  function shortMoney(v){ return money(v).replace(',00',''); }
+  function chartTooltipEl(){
+    let el=document.getElementById('chartTooltip');
+    if(!el){
+      el=document.createElement('div');
+      el.id='chartTooltip';
+      el.style.position='fixed';
+      el.style.zIndex='9999';
+      el.style.pointerEvents='none';
+      el.style.padding='8px 10px';
+      el.style.borderRadius='12px';
+      el.style.background='rgba(255,255,255,.86)';
+      el.style.border='1px solid rgba(0,0,0,.08)';
+      el.style.boxShadow='0 14px 35px rgba(0,0,0,.14)';
+      el.style.backdropFilter='blur(16px)';
+      el.style.webkitBackdropFilter='blur(16px)';
+      el.style.font='600 12px Host Grotesk';
+      el.style.color='#141414';
+      el.style.display='none';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function showChartTooltip(ev,item){
+    const el=chartTooltipEl();
+    el.innerHTML=`<div style="color:#6a6761;font-weight:600;margin-bottom:3px">${esc(item.label||'')}</div><div style="font-size:14px;font-weight:750">${esc(item.value||'')}</div>`;
+    el.style.left=Math.min(window.innerWidth-190,ev.clientX+14)+'px';
+    el.style.top=Math.max(12,ev.clientY-14)+'px';
+    el.style.display='block';
+  }
+  function hideChartTooltip(){ const el=document.getElementById('chartTooltip'); if(el) el.style.display='none'; }
+  function enableChartTooltip(c,items){
+    c.onmousemove=ev=>{
+      const rect=c.getBoundingClientRect();
+      const sx=c.width/rect.width, sy=c.height/rect.height;
+      const x=(ev.clientX-rect.left)*sx, y=(ev.clientY-rect.top)*sy;
+      const hit=items.find(it=>x>=it.x-6 && x<=it.x+it.w+6 && y>=it.y-8 && y<=it.y+it.h+8);
+      c.style.cursor=hit?'pointer':'default';
+      if(hit) showChartTooltip(ev,hit); else hideChartTooltip();
+    };
+    c.onmouseleave=()=>{ c.style.cursor='default'; hideChartTooltip(); };
+  }
+  function enableDonutTooltip(c,arcs){
+    c.onmousemove=ev=>{
+      const rect=c.getBoundingClientRect();
+      const sx=c.width/rect.width, sy=c.height/rect.height;
+      const x=(ev.clientX-rect.left)*sx, y=(ev.clientY-rect.top)*sy;
+      const hit=arcs.find(a=>{
+        const dx=x-a.cx, dy=y-a.cy, dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<a.r-a.width/2 || dist>a.r+a.width/2) return false;
+        let ang=Math.atan2(dy,dx); if(ang < -Math.PI/2) ang+=Math.PI*2;
+        let st=a.start, en=a.end; if(st < -Math.PI/2) st+=Math.PI*2; if(en < st) en+=Math.PI*2;
+        return ang>=st && ang<=en;
+      });
+      c.style.cursor=hit?'pointer':'default';
+      if(hit) showChartTooltip(ev,hit); else hideChartTooltip();
+    };
+    c.onmouseleave=()=>{ c.style.cursor='default'; hideChartTooltip(); };
+  }
   function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
 
   const SIDEBAR_KEY = 'ambiguo_sidebar_collapsed';
