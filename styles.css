@@ -1092,558 +1092,102 @@ h3,
   .dashboard-charts-6 .chart-wrap.small { height: 240px; }
 }
 
-/* --- Dashboard full-viewport refinement: consistent background + 3x2 charts filling 100svh --- */
-body {
-  background:
-    radial-gradient(circle at 11% 10%, rgba(195,101,34,.075), transparent 24%),
-    radial-gradient(circle at 88% 5%, rgba(255,255,255,.72), transparent 30%),
-    linear-gradient(135deg, #f4f4f1 0%, #eeefeb 48%, #f7f5f1 100%) !important;
+
+/* === FINAL SAFE FIX: ordini distributori chiusi + frecce pulite + stati ordini clienti === */
+.order-card.is-collapsed {
+  padding-bottom: 14px !important;
 }
-.app-shell,
-.main,
-.view,
-#view-dashboard {
-  background: transparent !important;
+.order-card.is-collapsed .table-scroll.compact {
+  display: none !important;
 }
-.card,
-.stat-card,
-.chart-card {
-  background: rgba(255,255,255,.66) !important;
-  border-color: rgba(255,255,255,.82) !important;
-  box-shadow: 0 16px 44px rgba(20,20,20,.055), inset 0 1px 0 rgba(255,255,255,.86) !important;
+.order-card-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-top: 16px !important;
 }
-
-@media (min-width: 1181px) {
-  html,
-  body {
-    height: 100%;
-    overflow: hidden !important;
-  }
-
-  .app-shell {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    padding: 14px 18px !important;
-    gap: 16px !important;
-    overflow: hidden !important;
-  }
-
-  .sidebar {
-    top: 14px !important;
-    height: calc(100svh - 28px) !important;
-  }
-
-  .main {
-    height: calc(100svh - 28px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    padding: 4px 4px 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .topbar {
-    flex: 0 0 auto !important;
-    margin: 0 0 10px !important;
-    align-items: flex-start !important;
-  }
-
-  .eyebrow {
-    margin-bottom: 2px !important;
-    font-size: 9.5px !important;
-    letter-spacing: .12em !important;
-  }
-
-  h1 {
-    font-size: clamp(36px, 3.2vw, 54px) !important;
-    line-height: .92 !important;
-  }
-
-  #view-dashboard.active {
-    display: grid !important;
-    grid-template-rows: 118px minmax(0, 1fr) !important;
-    gap: 12px !important;
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-    overflow: hidden !important;
-  }
-
-  #view-dashboard .grid.cards {
-    display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    gap: 12px !important;
-    height: 118px !important;
-    min-height: 118px !important;
-    margin: 0 !important;
-  }
-
-  #view-dashboard .stat-card {
-    min-height: 118px !important;
-    height: 118px !important;
-    padding: 18px 20px !important;
-    border-radius: 24px !important;
-  }
-
-  #view-dashboard .stat-label,
-  #view-dashboard .stat-note {
-    font-size: 11.5px !important;
-    line-height: 1.2 !important;
-  }
-
-  #view-dashboard .stat-value {
-    font-size: clamp(34px, 2.3vw, 46px) !important;
-    line-height: .92 !important;
-    letter-spacing: -.045em !important;
-  }
-
-  .dashboard-charts-6 {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
-    gap: 12px !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .dashboard-charts-6 .chart-card {
-    min-height: 0 !important;
-    height: 100% !important;
-    padding: 17px 18px 15px !important;
-    border-radius: 24px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  }
-
-  .dashboard-charts-6 .chart-card h2 {
-    font-size: 17px !important;
-    line-height: 1.08 !important;
-    margin: 0 0 8px !important;
-    letter-spacing: -.018em !important;
-  }
-
-  .dashboard-charts-6 .chart-wrap,
-  .dashboard-charts-6 .chart-wrap.small {
-    flex: 1 1 auto !important;
-    height: auto !important;
-    min-height: 0 !important;
-  }
-
-  .dashboard-charts-6 canvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
+.order-card-actions-left,
+.order-card-actions-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
-
-@media (min-width: 1181px) and (max-height: 760px) {
-  #view-dashboard.active { grid-template-rows: 100px minmax(0, 1fr) !important; gap: 10px !important; }
-  #view-dashboard .grid.cards,
-  #view-dashboard .stat-card { height: 100px !important; min-height: 100px !important; }
-  #view-dashboard .stat-card { padding: 13px 16px !important; }
-  #view-dashboard .stat-value { font-size: clamp(28px, 2.1vw, 38px) !important; }
-  .dashboard-charts-6 { gap: 10px !important; }
-  .dashboard-charts-6 .chart-card { padding: 13px 15px 12px !important; }
-  .dashboard-charts-6 .chart-card h2 { font-size: 15px !important; margin-bottom: 6px !important; }
+.order-card-actions-left {
+  justify-content: flex-start !important;
+  min-width: 44px !important;
 }
-
-/* =========================================================
-   FIX DASHBOARD SERIA — 3x2, 100svh, sidebar intatta, grafici nitidi
-   ========================================================= */
-
-@media (min-width: 1100px) {
-  body:has(.dashboard-section.is-active),
-  html:has(.dashboard-section.is-active) {
-    overflow: hidden;
-  }
-
-  .dashboard-section.is-active {
-    height: calc(100svh - 42px);
-    max-height: calc(100svh - 42px);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .dashboard-section.is-active .page-head {
-    margin-bottom: 12px;
-    flex: 0 0 auto;
-  }
-
-  .dashboard-section.is-active .kpi-grid,
-  .dashboard-section.is-active .stats-grid,
-  .dashboard-section.is-active .metrics-grid {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .dashboard-section.is-active .kpi-card,
-  .dashboard-section.is-active .stat-card,
-  .dashboard-section.is-active .metric-card {
-    min-height: 112px;
-    padding: 24px 26px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    background: rgba(255,255,255,.72);
-    border: 1px solid rgba(20,20,20,.07);
-    box-shadow: 0 12px 34px rgba(20,20,20,.055);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .dashboard-section.is-active .kpi-card strong,
-  .dashboard-section.is-active .stat-card strong,
-  .dashboard-section.is-active .metric-card strong {
-    line-height: .95;
-    letter-spacing: -0.035em;
-  }
-
-  .dashboard-section.is-active .chart-grid,
-  .dashboard-section.is-active .charts-grid,
-  .dashboard-section.is-active .dashboard-charts {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: 100%;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    overflow: hidden;
-  }
-
-  .dashboard-section.is-active .chart-card,
-  .dashboard-section.is-active .dashboard-chart-card,
-  .dashboard-section.is-active .graph-card {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    padding: 18px 20px 16px;
-    display: flex;
-    flex-direction: column;
-    background: rgba(255,255,255,.72);
-    border: 1px solid rgba(20,20,20,.07);
-    box-shadow: 0 12px 34px rgba(20,20,20,.055);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .dashboard-section.is-active .chart-card h3,
-  .dashboard-section.is-active .dashboard-chart-card h3,
-  .dashboard-section.is-active .graph-card h3 {
-    flex: 0 0 auto;
-    margin: 0 0 10px;
-    font-size: 15px;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
-  }
-
-  .dashboard-section.is-active svg,
-  .dashboard-section.is-active canvas {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    filter: none !important;
-    transform: none !important;
-    image-rendering: auto;
-    shape-rendering: geometricPrecision;
-    text-rendering: geometricPrecision;
-  }
-
-  .dashboard-section.is-active svg text {
-    filter: none !important;
-    text-shadow: none !important;
-    paint-order: normal;
-    font-synthesis: none;
-  }
-
-  .dashboard-section.is-active .chart-tooltip {
-    filter: none !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-}
-
-/* Ripristino sidebar: non deve mai essere influenzata dai fix dashboard */
-.sidebar,
-.app-sidebar,
-.side-nav,
-.sidebar *,
-.app-sidebar *,
-.side-nav * {
-  filter: none !important;
-}
-
-.sidebar .nav-link,
-.app-sidebar .nav-link,
-.side-nav .nav-link {
-  min-height: 42px;
-  height: auto;
-  padding: 0 14px;
-  border-radius: 18px;
-}
-
-.sidebar .nav-link.is-active,
-.app-sidebar .nav-link.is-active,
-.side-nav .nav-link.is-active {
-  background: #111 !important;
-  color: #fff !important;
-  box-shadow: none !important;
-}
-
-/* Bottone toggle sidebar centrato */
-.sidebar-toggle,
-.sidebar-collapse,
-.menu-toggle,
-button[data-sidebar-toggle] {
+.order-expand-toggle.clean {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(20,20,20,.10) !important;
+  background: rgba(255,255,255,.72) !important;
+  color: var(--ink) !important;
   display: grid !important;
   place-items: center !important;
-  text-align: center !important;
-  line-height: 1 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
-
-.sidebar-toggle svg,
-.sidebar-collapse svg,
-.menu-toggle svg,
-button[data-sidebar-toggle] svg {
+.order-expand-toggle.clean:hover {
+  background: rgba(255,255,255,.95) !important;
+  border-color: rgba(20,20,20,.18) !important;
+}
+.order-expand-toggle.clean svg {
+  width: 17px !important;
+  height: 17px !important;
   display: block !important;
-  margin: auto !important;
+  stroke: currentColor !important;
+  stroke-width: 2.4 !important;
+  fill: none !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  transform: none !important;
 }
-
-
-/* === DASHBOARD CHARTS FINAL CLEAN FIX === */
-
-@media (min-width: 1181px) {
-  body:has(#view-dashboard.active) {
-    overflow: hidden !important;
-  }
-
-  .app-shell:has(#view-dashboard.active) {
-    height: 100svh !important;
-    min-height: 100svh !important;
-    overflow: hidden !important;
-  }
-
-  .main:has(#view-dashboard.active) {
-    height: calc(100svh - 36px) !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding-bottom: 12px !important;
-  }
-
-  .main:has(#view-dashboard.active) .topbar {
-    flex: 0 0 auto !important;
-    margin-bottom: 14px !important;
-  }
-
-  #view-dashboard.active {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 14px !important;
-  }
-
-  #view-dashboard.active .grid.cards {
-    flex: 0 0 auto !important;
-    display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    margin: 0 !important;
-  }
-
-  #view-dashboard.active .stat-card {
-    min-height: 118px !important;
-    padding: 24px 26px !important;
-    border-radius: 22px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    gap: 8px !important;
-  }
-
-  #view-dashboard.active .stat-label {
-    font-size: 11px !important;
-    line-height: 1.1 !important;
-  }
-
-  #view-dashboard.active .stat-value {
-    line-height: 0.94 !important;
-    margin: 0 !important;
-  }
-
-  #view-dashboard.active .stat-note {
-    font-size: 11px !important;
-    line-height: 1.2 !important;
-  }
-
-  #view-dashboard.active .dashboard-charts-6 {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-  }
-
-  /* fallback se nel tuo app.js ci sono ancora due righe separate */
-  #view-dashboard.active > .grid.three.dashboard-charts {
-    flex: 1 1 0 !important;
-    min-height: 0 !important;
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 14px !important;
-    margin: 0 !important;
-  }
-
-  #view-dashboard.active .chart-card {
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 18px 20px 16px !important;
-    border-radius: 22px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-  }
-
-  #view-dashboard.active .chart-card h2,
-  #view-dashboard.active .chart-card h3 {
-    flex: 0 0 auto !important;
-    margin: 0 0 10px !important;
-    font-size: 15px !important;
-    line-height: 1.15 !important;
-    letter-spacing: -0.01em !important;
-  }
-
-  #view-dashboard.active .chart-wrap,
-  #view-dashboard.active .chart-wrap.small {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    height: auto !important;
-    width: 100% !important;
-    overflow: hidden !important;
-  }
-
-  #view-dashboard.active canvas {
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-    filter: none !important;
-    transform: none !important;
-    image-rendering: auto !important;
-  }
+.order-card.is-expanded .order-expand-toggle.clean svg {
+  transform: rotate(180deg) !important;
 }
-
-@media (min-width: 1181px) and (max-height: 820px) {
-  #view-dashboard.active .stat-card {
-    min-height: 102px !important;
-    padding: 20px 22px !important;
-  }
-
-  #view-dashboard.active {
-    gap: 10px !important;
-  }
-
-  #view-dashboard.active .dashboard-charts-6,
-  #view-dashboard.active > .grid.three.dashboard-charts {
-    gap: 10px !important;
-  }
-
-  #view-dashboard.active .chart-card {
-    padding: 14px 16px 12px !important;
-  }
+.client-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: fit-content !important;
+  min-width: 82px !important;
+  padding: 8px 13px !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  letter-spacing: -0.01em !important;
+  border: 1px solid transparent !important;
 }
-
-/* === END DASHBOARD CHARTS FINAL CLEAN FIX === */
-
-
-/* === DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
-
-.dist-order-card-fixed {
-  position: relative;
+.client-status-pill.is-paid {
+  color: #1f6b3a !important;
+  background: rgba(70,170,105,.14) !important;
+  border-color: rgba(70,170,105,.22) !important;
 }
-
-.dist-order-card-fixed.is-collapsed table,
-.dist-order-card-fixed.is-collapsed .order-lines,
-.dist-order-card-fixed.is-collapsed .order-table,
-.dist-order-card-fixed.is-collapsed .table-wrap,
-.dist-order-card-fixed.is-collapsed .responsive-table {
-  display: none !important;
+.client-status-pill.is-unpaid {
+  color: #8f2d1f !important;
+  background: rgba(198,101,34,.14) !important;
+  border-color: rgba(198,101,34,.24) !important;
 }
-
-.dist-order-collapse-row {
-  width: 100%;
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  margin-top: 14px;
-  padding-top: 8px;
+.client-status-pill.is-confirmed {
+  color: #8a5a00 !important;
+  background: rgba(210,158,47,.16) !important;
+  border-color: rgba(210,158,47,.26) !important;
 }
-
-.dist-order-collapse-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 15, 15, 0.12);
-  background: rgba(255, 255, 255, 0.72);
-  color: #111;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: none;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: background .18s ease, transform .18s ease, border-color .18s ease;
+.client-status-pill.is-neutral {
+  color: #555 !important;
+  background: rgba(20,20,20,.06) !important;
+  border-color: rgba(20,20,20,.08) !important;
 }
-
-.dist-order-collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.94);
-  border-color: rgba(15, 15, 15, 0.22);
-  transform: translateY(-1px);
+#view-dashboard.active canvas {
+  image-rendering: auto !important;
+  filter: none !important;
+  transform: none !important;
 }
-
-.dist-order-collapse-btn:active {
-  transform: translateY(0);
-}
-
-.dist-order-collapse-btn svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-  stroke: currentColor;
-  stroke-width: 2.35;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.dist-order-card-fixed.is-expanded .dist-order-collapse-btn svg {
-  transform: rotate(180deg);
-}
-
-.dist-order-card-fixed .dist-order-old-expand,
-.dist-order-card-fixed button.dist-order-old-expand {
-  display: none !important;
-}
-
-/* evita bottoni testuali tipo "Mostra tutte" */
-.dist-order-card-fixed button[data-old-expand="true"] {
-  display: none !important;
-}
-
-/* === END DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
-

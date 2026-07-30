@@ -6,7 +6,7 @@
   let sortState = { key: 'name', dir: 'asc' };
   let orderSortState = { key: 'date', dir: 'desc' };
   let searchTerm = '';
-  let saleFilters = { status: '', payment: '', recipient: '', sort: 'date:desc' };
+  let saleFilters = { status: '', payment: '', recipient: '', sort: 'code:desc' };
   const expandedOrders = new Set();
 
   const views = {
@@ -122,6 +122,8 @@
   }
   function wineStatus(w){ if(w.archived) return 'archiviato'; if(Number(w.quantity||0)<=0) return 'esaurito'; if(Number(w.quantity||0)<=Number(state.settings.lowStockThreshold||0)) return 'giacenza bassa'; return 'disponibile'; }
   function tagBadge(tag){ const t=String(tag||'').toLowerCase(); return `<span class="badge tag-badge tag-${esc(t)}">${esc(tag||'—')}</span>`; }
+  function saleCodeNum(code){ const m=String(code||'').match(/CLI[-–—]?\s*(\d+)/i); return m ? Number(m[1]) : 0; }
+  function clientStatusClass(status){ const s=String(status||'').toLowerCase(); if(s.includes('pagato')&&!s.includes('non')) return 'is-paid'; if(s.includes('confermato')) return 'is-confirmed'; if(s.includes('da pagare')||s.includes('da incassare')||s.includes('non pagato')||s.includes('aperto')||s.includes('pending')) return 'is-unpaid'; return 'is-neutral'; }
   function nextCode(prefix, arr){ return `${prefix}-${String((arr?.length||0)+1).padStart(3,'0')}`; }
 
   function filteredWines(){ const q=norm(searchTerm); return state.wines.filter(w=>!q || [w.code,w.name,w.producer,w.vintage,w.size,w.tag,distributorName(w.distributorId)].some(v=>norm(v).includes(q))); }
@@ -140,7 +142,7 @@
     rows.sort((a,b)=>{
       let av,bv;
       if(key==='date'){ av=parseDateFlexible(a.date).getTime(); bv=parseDateFlexible(b.date).getTime(); }
-      else if(key==='code'){ av=String(a.code||''); bv=String(b.code||''); }
+      else if(key==='code'){ av=saleCodeNum(a.code); bv=saleCodeNum(b.code); }
       else if(key==='amount'){ av=Number(a.totals?.total||0); bv=Number(b.totals?.total||0); }
       else if(key==='margin'){ av=Number(a.totals?.margin||0); bv=Number(b.totals?.margin||0); }
       else if(key==='customer'){ av=customerName(a.customerId); bv=customerName(b.customerId); }
@@ -429,15 +431,15 @@
   }
   function orderCard(o){
     const isExpanded = expandedOrders.has(o.id);
-    const visibleLines = isExpanded ? o.lines : o.lines.slice(0, 5);
-    const rows=visibleLines.map(l=>{ const t=lineTotals(l); return `<tr><td class="cell-title">${esc(l.code)}</td><td>${esc(l.name)}</td><td>${esc(l.producer)}</td><td>${esc(l.vintage||'—')}</td><td>${tagBadge(l.tag)}</td><td>${number(l.quantity)}</td><td>${money(l.netUnitPrice)}</td><td>${discountLabel(l)}</td><td>${money(l.resalePrice)}</td><td>${money(t.grossTotal)}</td></tr>`; }).join('');
-    const toggle = o.lines.length > 5 ? `<button class="order-expand-toggle icon-only" data-action="toggle-order-lines" data-id="${o.id}" title="${isExpanded?'Raggruppa righe':'Mostra tutte le righe'}" aria-label="${isExpanded?'Raggruppa righe':'Mostra tutte le righe'}"><span aria-hidden="true">${isExpanded?'↑':'↓'}</span></button>` : '';
-    return `<article class="order-card"><div class="order-card-head"><div><div class="order-date">${dateIT(o.date)}</div><h2>${esc(distributorName(o.distributorId))}</h2><p>${o.customerId?`Cliente ref. ${esc(customerName(o.customerId))}`:'Nessun cliente associato'} · ${esc(o.code)}</p></div><div class="order-total"><strong>${money(o.totals?.grossTotal)}</strong><span>${number(o.totals?.quantity)} bottiglie · ${number(o.lines.length)} referenze</span><span class="badge">${esc(o.status)}</span><span class="badge">${esc(o.paymentStatus||'da pagare')}</span></div></div><div class="table-scroll compact"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${rows}</tbody></table></div><div class="order-card-actions"><div class="order-card-actions-left">${toggle}</div><div class="order-card-actions-right"><button class="btn small secondary" data-action="edit-order" data-id="${o.id}">Modifica dati</button><button class="btn small ghost" data-action="view-order" data-id="${o.id}">Apri dettaglio</button><button class="btn small ghost" data-action="duplicate-order" data-id="${o.id}">Duplica</button><button class="btn small danger" data-action="delete-order" data-id="${o.id}">Elimina</button></div></div></article>`;
+    const rows=(o.lines||[]).map(l=>{ const t=lineTotals(l); return `<tr><td class="cell-title">${esc(l.code)}</td><td>${esc(l.name)}</td><td>${esc(l.producer)}</td><td>${esc(l.vintage||'—')}</td><td>${tagBadge(l.tag)}</td><td>${number(l.quantity)}</td><td>${money(l.netUnitPrice)}</td><td>${discountLabel(l)}</td><td>${money(l.resalePrice)}</td><td>${money(t.grossTotal)}</td></tr>`; }).join('');
+    const table = isExpanded ? `<div class="table-scroll compact"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${rows}</tbody></table></div>` : '';
+    const toggle = `<button class="order-expand-toggle clean" data-action="toggle-order-lines" data-id="${o.id}" title="${isExpanded?'Raggruppa ordine':'Espandi ordine'}" aria-label="${isExpanded?'Raggruppa ordine':'Espandi ordine'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>`;
+    return `<article class="order-card ${isExpanded?'is-expanded':'is-collapsed'}"><div class="order-card-head"><div><div class="order-date">${dateIT(o.date)}</div><h2>${esc(distributorName(o.distributorId))}</h2><p>${o.customerId?`Cliente ref. ${esc(customerName(o.customerId))}`:'Nessun cliente associato'} · ${esc(o.code)}</p></div><div class="order-total"><strong>${money(o.totals?.grossTotal)}</strong><span>${number(o.totals?.quantity)} bottiglie · ${number(o.lines.length)} referenze</span><span class="badge">${esc(o.status)}</span><span class="badge">${esc(o.paymentStatus||'da pagare')}</span></div></div>${table}<div class="order-card-actions"><div class="order-card-actions-left">${toggle}</div><div class="order-card-actions-right"><button class="btn small secondary" data-action="edit-order" data-id="${o.id}">Modifica dati</button><button class="btn small ghost" data-action="view-order" data-id="${o.id}">Apri dettaglio</button><button class="btn small ghost" data-action="duplicate-order" data-id="${o.id}">Duplica</button><button class="btn small danger" data-action="delete-order" data-id="${o.id}">Elimina</button></div></div></article>`;
   }
 
   function renderVendite(){
     const sales=filteredSales();
-    views.vendite.innerHTML=`<div class="section-head"><div class="filters"><select id="saleStatusFilter" class="filter"><option value="">Tutti gli stati</option>${SALE_STATUSES.map(x=>`<option value="${x}" ${saleFilters.status===x?'selected':''}>${x}</option>`).join('')}</select><select id="salePaymentFilter" class="filter"><option value="">Tutti i pagamenti</option>${PAYMENT_METHODS.map(x=>`<option value="${x}" ${saleFilters.payment===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleRecipientFilter" class="filter"><option value="">Tutti i destinatari</option>${PAYMENT_RECIPIENTS.map(x=>`<option value="${x}" ${saleFilters.recipient===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleSort" class="filter"><option value="date:desc" ${saleFilters.sort==='date:desc'?'selected':''}>Ordina: data recente</option><option value="date:asc" ${saleFilters.sort==='date:asc'?'selected':''}>Ordina: data vecchia</option><option value="code:asc" ${saleFilters.sort==='code:asc'?'selected':''}>Ordina: numero ordine A-Z</option><option value="code:desc" ${saleFilters.sort==='code:desc'?'selected':''}>Ordina: numero ordine Z-A</option><option value="amount:desc" ${saleFilters.sort==='amount:desc'?'selected':''}>Ordina: importo alto</option><option value="amount:asc" ${saleFilters.sort==='amount:asc'?'selected':''}>Ordina: importo basso</option><option value="margin:desc" ${saleFilters.sort==='margin:desc'?'selected':''}>Ordina: margine alto</option><option value="customer:asc" ${saleFilters.sort==='customer:asc'?'selected':''}>Ordina: cliente A-Z</option></select></div><button class="btn primary" data-action="new-sale">Nuovo ordine cliente</button></div><div class="card table-card">${sales.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Codice</th><th>Cliente</th><th>Stato</th><th>Pagamento</th><th>Mandati a</th><th>Bottiglie</th><th>Totale</th><th>Costo bottiglie</th><th>Margine</th><th>Note</th><th></th></tr></thead><tbody>${sales.map(s=>`<tr><td class="cell-title">${dateIT(s.date)}</td><td>${esc(s.code)}</td><td>${esc(customerName(s.customerId))}</td><td><span class="badge">${esc(s.status)}</span></td><td>${esc(s.paymentMethod||'—')}</td><td>${esc(s.paymentRecipient||'—')}</td><td>${number(s.totals?.quantity)}</td><td>${money(s.totals?.total)}</td><td>${money(s.totals?.cost)}</td><td>${money(s.totals?.margin)}</td><td>${esc(s.notes||'—')}</td><td><div class="actions"><button class="btn small secondary" data-action="edit-sale" data-id="${s.id}">Modifica</button><button class="btn small ghost" data-action="duplicate-sale" data-id="${s.id}">Duplica</button><button class="btn small danger" data-action="delete-sale" data-id="${s.id}">Elimina</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun ordine cliente registrato.</div>`}</div>`;
+    views.vendite.innerHTML=`<div class="section-head"><div class="filters"><select id="saleStatusFilter" class="filter"><option value="">Tutti gli stati</option>${SALE_STATUSES.map(x=>`<option value="${x}" ${saleFilters.status===x?'selected':''}>${x}</option>`).join('')}</select><select id="salePaymentFilter" class="filter"><option value="">Tutti i pagamenti</option>${PAYMENT_METHODS.map(x=>`<option value="${x}" ${saleFilters.payment===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleRecipientFilter" class="filter"><option value="">Tutti i destinatari</option>${PAYMENT_RECIPIENTS.map(x=>`<option value="${x}" ${saleFilters.recipient===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleSort" class="filter"><option value="code:desc" ${saleFilters.sort==='code:desc'?'selected':''}>Ordina: codice decrescente</option><option value="code:asc" ${saleFilters.sort==='code:asc'?'selected':''}>Ordina: codice crescente</option><option value="date:desc" ${saleFilters.sort==='date:desc'?'selected':''}>Ordina: data recente</option><option value="date:asc" ${saleFilters.sort==='date:asc'?'selected':''}>Ordina: data vecchia</option><option value="amount:desc" ${saleFilters.sort==='amount:desc'?'selected':''}>Ordina: importo alto</option><option value="amount:asc" ${saleFilters.sort==='amount:asc'?'selected':''}>Ordina: importo basso</option><option value="margin:desc" ${saleFilters.sort==='margin:desc'?'selected':''}>Ordina: margine alto</option><option value="customer:asc" ${saleFilters.sort==='customer:asc'?'selected':''}>Ordina: cliente A-Z</option></select></div><button class="btn primary" data-action="new-sale">Nuovo ordine cliente</button></div><div class="card table-card">${sales.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Codice</th><th>Cliente</th><th>Stato</th><th>Pagamento</th><th>Mandati a</th><th>Bottiglie</th><th>Totale</th><th>Costo bottiglie</th><th>Margine</th><th>Note</th><th></th></tr></thead><tbody>${sales.map(s=>`<tr><td class="cell-title">${dateIT(s.date)}</td><td>${esc(s.code)}</td><td>${esc(customerName(s.customerId))}</td><td><span class="badge client-status-pill ${clientStatusClass(s.status)}">${esc(s.status)}</span></td><td>${esc(s.paymentMethod||'—')}</td><td>${esc(s.paymentRecipient||'—')}</td><td>${number(s.totals?.quantity)}</td><td>${money(s.totals?.total)}</td><td>${money(s.totals?.cost)}</td><td>${money(s.totals?.margin)}</td><td>${esc(s.notes||'—')}</td><td><div class="actions"><button class="btn small secondary" data-action="edit-sale" data-id="${s.id}">Modifica</button><button class="btn small ghost" data-action="duplicate-sale" data-id="${s.id}">Duplica</button><button class="btn small danger" data-action="delete-sale" data-id="${s.id}">Elimina</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun ordine cliente registrato.</div>`}</div>`;
     document.getElementById('saleStatusFilter')?.addEventListener('change',e=>{ saleFilters.status=e.target.value; renderVendite(); });
     document.getElementById('salePaymentFilter')?.addEventListener('change',e=>{ saleFilters.payment=e.target.value; renderVendite(); });
     document.getElementById('saleRecipientFilter')?.addEventListener('change',e=>{ saleFilters.recipient=e.target.value; renderVendite(); });
@@ -1198,7 +1200,7 @@
 
   function drawBarChart(id, labels, series, names){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
+    const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     const pad={l:54,r:34,t:50,b:46};
     ctx.clearRect(0,0,W,H);
     const vals=series.flat().map(v=>Number(v||0));
@@ -1228,7 +1230,7 @@
 
   function drawLineChart(id, labels, values, label=''){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
+    const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     const pad={l:58,r:40,t:42,b:46};
     ctx.clearRect(0,0,W,H);
     const max=niceMax(Math.max(...values.map(v=>Number(v||0)),0));
@@ -1274,7 +1276,7 @@
 
   function drawSingleBarChart(id, items, label='Valore'){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
+    const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     ctx.clearRect(0,0,W,H);
     if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
     const pad={l:116,r:38,t:34,b:30};
@@ -1305,7 +1307,7 @@
 
   function drawDonutChart(id,items){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
-    const ctx=c.getContext('2d'), W=c._chartW || c.width, H=c._chartH || c.height;
+    const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     ctx.clearRect(0,0,W,H);
     if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); return; }
     const total=items.reduce((s,i)=>s+Number(i.value||0),0);
@@ -1349,22 +1351,19 @@
     ctx.textAlign='left';
   }
   function setupCanvas(c){
-    const rect = c.getBoundingClientRect();
-    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const cssW = Math.max(320, Math.floor(rect.width));
-    const cssH = Math.max(180, Math.floor(rect.height));
-
-    c.style.width = cssW + 'px';
-    c.style.height = cssH + 'px';
-    c.width = Math.floor(cssW * dpr);
-    c.height = Math.floor(cssH * dpr);
-
-    c._chartW = cssW;
-    c._chartH = cssH;
-    c._chartDpr = dpr;
-
-    const ctx = c.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r=c.getBoundingClientRect();
+    const dpr=Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW=Math.max(320, Math.floor(r.width));
+    const cssH=Math.max(180, Math.floor(r.height));
+    c.style.width=cssW+'px';
+    c.style.height=cssH+'px';
+    c.width=Math.floor(cssW*dpr);
+    c.height=Math.floor(cssH*dpr);
+    c._chartW=cssW;
+    c._chartH=cssH;
+    c._chartDpr=dpr;
+    const ctx=c.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
   }
   function niceMax(v){
     if(v<=0) return 0;
@@ -1522,186 +1521,3 @@
   cleanupEmptyOrderWines();
   render();
 })();
-
-
-/* === DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
-(function installDistributorOrdersCollapseFix(){
-  const expandedOrders = new Set();
-
-  function isDistributorOrdersPage() {
-    const title = document.querySelector("h1, .page-title, .view-title");
-    return title && title.textContent.trim().toLowerCase().includes("ordini distributori");
-  }
-
-  function svgChevronDown() {
-    return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6 9l6 6 6-6"></path>
-      </svg>
-    `;
-  }
-
-  function getOrderKey(card, index) {
-    const text = card.textContent || "";
-    const code = text.match(/ORD[-–—]\s*\d+/i);
-    if (code) return code[0].replace(/\s+/g, "");
-    const title = card.querySelector("h2,h3,strong,b")?.textContent?.trim() || "";
-    const date = text.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || "";
-    return `${date}-${title}-${index}`;
-  }
-
-  function findOrderCards() {
-    if (!isDistributorOrdersPage()) return [];
-
-    const tables = Array.from(document.querySelectorAll("table"));
-    const cards = [];
-
-    tables.forEach((table) => {
-      let el = table.parentElement;
-      let chosen = null;
-
-      while (el && el !== document.body) {
-        const text = el.textContent || "";
-        const hasOrderCode = /ORD[-–—]\s*\d+/i.test(text);
-        const hasDistributorActions =
-          text.includes("Modifica dati") ||
-          text.includes("Apri dettaglio") ||
-          text.includes("Duplica") ||
-          text.includes("Elimina");
-
-        if (hasOrderCode && hasDistributorActions) {
-          chosen = el;
-          break;
-        }
-
-        el = el.parentElement;
-      }
-
-      if (chosen && !cards.includes(chosen)) cards.push(chosen);
-    });
-
-    return cards;
-  }
-
-  function removeOldExpandButtons(card) {
-    const buttons = Array.from(card.querySelectorAll("button"));
-    buttons.forEach((btn) => {
-      const t = btn.textContent.trim().toLowerCase();
-      if (
-        t.includes("mostra tutte") ||
-        t.includes("raggruppa") ||
-        t === "↓" ||
-        t === "↑"
-      ) {
-        btn.dataset.oldExpand = "true";
-        btn.classList.add("dist-order-old-expand");
-        btn.style.display = "none";
-      }
-    });
-  }
-
-  function getInsertPoint(card) {
-    const table = card.querySelector("table");
-    if (table) return table;
-
-    const tableLike = card.querySelector(".order-lines,.order-table,.table-wrap,.responsive-table");
-    if (tableLike) return tableLike;
-
-    return null;
-  }
-
-  function enhanceOrderCards() {
-    if (!isDistributorOrdersPage()) return;
-
-    const cards = findOrderCards();
-
-    cards.forEach((card, index) => {
-      const key = getOrderKey(card, index);
-
-      card.classList.add("dist-order-card-fixed");
-      card.dataset.distOrderKey = key;
-
-      removeOldExpandButtons(card);
-
-      let row = card.querySelector(":scope > .dist-order-collapse-row");
-      if (!row) {
-        row = document.createElement("div");
-        row.className = "dist-order-collapse-row";
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "dist-order-collapse-btn";
-        btn.innerHTML = svgChevronDown();
-        btn.setAttribute("aria-label", "Espandi ordine");
-        btn.title = "Espandi ordine";
-
-        btn.addEventListener("click", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-
-          const isExpanded = card.classList.contains("is-expanded");
-
-          if (isExpanded) {
-            expandedOrders.delete(key);
-            card.classList.remove("is-expanded");
-            card.classList.add("is-collapsed");
-            btn.setAttribute("aria-label", "Espandi ordine");
-            btn.title = "Espandi ordine";
-          } else {
-            expandedOrders.add(key);
-            card.classList.add("is-expanded");
-            card.classList.remove("is-collapsed");
-            btn.setAttribute("aria-label", "Raggruppa ordine");
-            btn.title = "Raggruppa ordine";
-          }
-        });
-
-        row.appendChild(btn);
-
-        const insertPoint = getInsertPoint(card);
-        if (insertPoint && insertPoint.parentNode) {
-          insertPoint.parentNode.insertBefore(row, insertPoint.nextSibling);
-        } else {
-          card.appendChild(row);
-        }
-      }
-
-      if (expandedOrders.has(key)) {
-        card.classList.add("is-expanded");
-        card.classList.remove("is-collapsed");
-      } else {
-        card.classList.add("is-collapsed");
-        card.classList.remove("is-expanded");
-      }
-    });
-  }
-
-  const run = () => {
-    requestAnimationFrame(() => {
-      enhanceOrderCards();
-      setTimeout(enhanceOrderCards, 120);
-    });
-  };
-
-  document.addEventListener("click", () => setTimeout(run, 80), true);
-  document.addEventListener("input", () => setTimeout(run, 80), true);
-  document.addEventListener("change", () => setTimeout(run, 80), true);
-
-  const observer = new MutationObserver(() => {
-    clearTimeout(window.__distOrderCollapseTimer);
-    window.__distOrderCollapseTimer = setTimeout(run, 80);
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
-  } else {
-    run();
-  }
-})();
-/* === END DISTRIBUTOR ORDERS COLLAPSE FINAL FIX === */
-
