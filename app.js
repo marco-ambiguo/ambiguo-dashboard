@@ -50,7 +50,25 @@
   function money(v){ return new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(Number(v||0)); }
   function number(v){ return new Intl.NumberFormat('it-IT').format(Number(v||0)); }
   function todayISO(){ return new Date().toISOString().slice(0,10); }
-  function dateIT(iso){ if(!iso) return '—'; const d=new Date(iso); return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('it-IT'); }
+  function parseDateFlexible(value){
+    if(!value) return new Date();
+    if(value instanceof Date) return value;
+    const raw=String(value).trim();
+    const iso=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(iso) return new Date(Number(iso[1]), Number(iso[2])-1, Number(iso[3]));
+    const it=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+    if(it){
+      const a=Number(it[1]), b=Number(it[2]), y=Number(it[3]);
+      // Se il primo numero supera 12 è sicuramente GG/MM/AAAA.
+      // Se il secondo supera 12 è MM/GG/AAAA. Se sono ambigui, per Ambiguo usiamo GG/MM/AAAA.
+      const day = a>12 ? a : (b>12 ? b : a);
+      const month = a>12 ? b : (b>12 ? a : b);
+      return new Date(y, month-1, day);
+    }
+    const d=new Date(raw);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  }
+  function dateIT(iso){ if(!iso) return '—'; const d=parseDateFlexible(iso); return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('it-IT'); }
   function round2(v){ return Math.round((Number(v||0)+Number.EPSILON)*100)/100; }
   function norm(v){ return String(v||'').toLowerCase().trim(); }
   function calcVat(net, rate=state.settings.vatRate){ return Number(net||0)*Number(rate||0)/100; }
@@ -107,7 +125,29 @@
 
   function filteredWines(){ const q=norm(searchTerm); return state.wines.filter(w=>!q || [w.code,w.name,w.producer,w.vintage,w.size,w.tag,distributorName(w.distributorId)].some(v=>norm(v).includes(q))); }
   function filteredOrders(){ const q=norm(searchTerm); return state.orders.filter(o=>!q || [o.code,distributorName(o.distributorId),customerName(o.customerId),o.date,o.notes].some(v=>norm(v).includes(q)) || o.lines.some(l=>[l.code,l.name,l.producer,l.vintage,l.tag].some(v=>norm(v).includes(q)))); }
-  function filteredSales(){ const q=norm(searchTerm); return state.sales.filter(s=>!q || [s.code,customerName(s.customerId),s.date,s.status,s.notes].some(v=>norm(v).includes(q)) || s.lines.some(l=>norm(getWine(l.wineId)?.name).includes(q))); }
+  function filteredSales(){
+    const q=norm(searchTerm);
+    let rows=state.sales.filter(s=>{
+      const textOk=!q || [s.code,customerName(s.customerId),s.date,s.status,s.paymentMethod,s.paymentRecipient,s.notes].some(v=>norm(v).includes(q)) || s.lines.some(l=>norm(getWine(l.wineId)?.name).includes(q));
+      const statusOk=!saleFilters.status || String(s.status||'')===saleFilters.status;
+      const paymentOk=!saleFilters.payment || String(s.paymentMethod||'')===saleFilters.payment;
+      const recipientOk=!saleFilters.recipient || String(s.paymentRecipient||'')===saleFilters.recipient;
+      return textOk && statusOk && paymentOk && recipientOk;
+    });
+    const [key,dir]=(saleFilters.sort||'date:desc').split(':');
+    const sign=dir==='asc'?1:-1;
+    rows.sort((a,b)=>{
+      let av,bv;
+      if(key==='date'){ av=parseDateFlexible(a.date).getTime(); bv=parseDateFlexible(b.date).getTime(); }
+      else if(key==='code'){ av=String(a.code||''); bv=String(b.code||''); }
+      else if(key==='amount'){ av=Number(a.totals?.total||0); bv=Number(b.totals?.total||0); }
+      else if(key==='margin'){ av=Number(a.totals?.margin||0); bv=Number(b.totals?.margin||0); }
+      else if(key==='customer'){ av=customerName(a.customerId); bv=customerName(b.customerId); }
+      else { av=String(a.date||''); bv=String(b.date||''); }
+      return (av>bv?1:av<bv?-1:0)*sign;
+    });
+    return rows;
+  }
   function filteredCustomers(){ const q=norm(searchTerm); return state.customers.filter(c=>!q || [c.name,c.type,c.email,c.phone,c.notes].some(v=>norm(v).includes(q))); }
   function filteredDistributors(){ const q=norm(searchTerm); return state.distributors.filter(d=>!q || [d.name,d.notes].some(v=>norm(v).includes(q))); }
 
@@ -124,32 +164,53 @@
   }
 
   function monthKeyFromDate(value){
-    const d=new Date(value || todayISO());
-    if(Number.isNaN(d.getTime())) return String(value||'').slice(0,7);
-    return d.toISOString().slice(0,7);
+    const d=parseDateFlexible(value || todayISO());
+    if(Number.isNaN(d.getTime())) return todayISO().slice(0,7);
+    const y=d.getFullYear();
+    const m=String(d.getMonth()+1).padStart(2,'0');
+    return `${y}-${m}`;
   }
 
   function monthlyData(){
-    const months=[]; const now=new Date();
+    const sourceDates=[];
+    state.orders.forEach(o=>sourceDates.push(o.date||o.createdAt));
+    state.sales.forEach(s=>sourceDates.push(s.date||s.createdAt));
+    state.movements.forEach(m=>sourceDates.push(m.date||m.createdAt));
+    state.wines.forEach(w=>sourceDates.push(w.lastOrderDate||w.lastPurchaseDate||w.createdAt));
+    const validDates=sourceDates.map(parseDateFlexible).filter(d=>d && !Number.isNaN(d.getTime()));
+    const latest=validDates.length ? new Date(Math.max(...validDates.map(d=>d.getTime()), new Date().getTime())) : new Date();
+    const months=[];
     for(let i=5;i>=0;i--){
-      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-      const end=new Date(now.getFullYear(),now.getMonth()-i+1,0,23,59,59);
-      const key=d.toISOString().slice(0,7);
+      const d=new Date(latest.getFullYear(),latest.getMonth()-i,1);
+      const end=new Date(latest.getFullYear(),latest.getMonth()-i+1,0,23,59,59);
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       months.push({key,label:d.toLocaleDateString('it-IT',{month:'short'}),end,spent:0,sales:0,inQty:0,outQty:0,value:0});
     }
 
-    // Entrate/uscite economiche: ordini distributori e ordini clienti.
-    state.orders.forEach(o=>{
+    state.orders.filter(o=>o.status!=='annullato').forEach(o=>{
       const b=months.find(m=>m.key===monthKeyFromDate(o.date || o.createdAt));
-      if(b) b.spent+=Number(o.totals?.grossTotal || calculateOrderTotals(o.lines||[]).grossTotal || 0);
-    });
-    state.sales.filter(s=>s.status!=='annullato').forEach(s=>{
-      const b=months.find(m=>m.key===monthKeyFromDate(s.date || s.createdAt));
-      if(b) b.sales+=Number(s.totals?.total || calculateSaleTotals(s.lines||[]).total || 0);
+      if(b){
+        const totals=o.totals || calculateOrderTotals(o.lines||[]);
+        b.spent+=Number(totals.grossTotal || 0);
+        // Usa sempre anche gli ordini come sorgente per le entrate, perché i dati vecchi possono non avere movimenti completi.
+        b.inQty+=Number(totals.quantity || 0);
+      }
     });
 
-    // Entrate/uscite bottiglie: movimenti reali, così funziona anche con inserimenti manuali o rettifiche.
+    state.sales.filter(s=>s.status!=='annullato').forEach(s=>{
+      const b=months.find(m=>m.key===monthKeyFromDate(s.date || s.createdAt));
+      if(b){
+        const totals=s.totals || calculateSaleTotals(s.lines||[]);
+        b.sales+=Number(totals.total || 0);
+        // Usa sempre anche gli ordini clienti come sorgente per le uscite.
+        b.outQty+=Number(totals.quantity || 0);
+      }
+    });
+
+    // Integra eventuali movimenti manuali che non derivano da ordine/vendita.
     state.movements.forEach(move=>{
+      const source=String(move.sourceType||'').toLowerCase();
+      if(['order','sale'].includes(source)) return;
       const b=months.find(m=>m.key===monthKeyFromDate(move.date || move.createdAt));
       if(!b) return;
       const q=Number(move.quantityChange||0);
@@ -157,21 +218,20 @@
       if(q<0) b.outQty+=Math.abs(q);
     });
 
-    // Fallback robusto: per dati vecchi senza movimenti, usa quantità ordini/vendite.
-    const hasMovementsInMonths=months.some(m=>m.inQty>0 || m.outQty>0);
-    if(!hasMovementsInMonths){
-      state.orders.forEach(o=>{ const b=months.find(m=>m.key===monthKeyFromDate(o.date || o.createdAt)); if(b) b.inQty+=Number(o.totals?.quantity || calculateOrderTotals(o.lines||[]).quantity || 0); });
-      state.sales.filter(s=>s.status!=='annullato').forEach(s=>{ const b=months.find(m=>m.key===monthKeyFromDate(s.date || s.createdAt)); if(b) b.outQty+=Number(s.totals?.quantity || calculateSaleTotals(s.lines||[]).quantity || 0); });
-    }
-
     months.forEach(m=>{
+      // Valore cantina nel tempo: se ci sono movimenti storici usa quelli, altrimenti mostra il valore attuale sul mese più recente.
       const qtyByWine={};
       state.movements.forEach(move=>{
-        const md=new Date(move.date||move.createdAt||todayISO());
+        const md=parseDateFlexible(move.date||move.createdAt||todayISO());
         if(md<=m.end) qtyByWine[move.wineId]=(qtyByWine[move.wineId]||0)+Number(move.quantityChange||0);
       });
-      m.value=Object.entries(qtyByWine).reduce((sum,[wineId,qty])=>{ const w=getWine(wineId); return sum + Math.max(0,qty)*Number(w?.resalePrice||0); },0);
+      const historical=Object.entries(qtyByWine).reduce((sum,[wineId,qty])=>{ const w=getWine(wineId); return sum + Math.max(0,qty)*Number(w?.resalePrice||0); },0);
+      m.value=historical;
     });
+    if(!months.some(m=>m.value>0)){
+      const currentValue=state.wines.filter(w=>!w.archived && intQty(w.quantity)>0).reduce((sum,w)=>sum+Number(w.resalePrice||0)*intQty(w.quantity||0),0);
+      if(months.length) months[months.length-1].value=currentValue;
+    }
     return months;
   }
   function distributorBreakdown(){ const items=activeDistributors().map(d=>({label:d.name,value:0})); state.orders.forEach(o=>{ const it=items.find(x=>x.label===distributorName(o.distributorId)); if(it) it.value+=Number(o.totals?.grossTotal || calculateOrderTotals(o.lines||[]).grossTotal || 0); }); return items.filter(i=>i.value>0); }
@@ -355,7 +415,15 @@
     return `<article class="order-card"><div class="order-card-head"><div><div class="order-date">${dateIT(o.date)}</div><h2>${esc(distributorName(o.distributorId))}</h2><p>${o.customerId?`Cliente ref. ${esc(customerName(o.customerId))}`:'Nessun cliente associato'} · ${esc(o.code)}</p></div><div class="order-total"><strong>${money(o.totals?.grossTotal)}</strong><span>${number(o.totals?.quantity)} bottiglie · ${number(o.lines.length)} referenze</span><span class="badge">${esc(o.status)}</span><span class="badge">${esc(o.paymentStatus||'da pagare')}</span></div></div><div class="table-scroll compact"><table><thead><tr><th>Codice</th><th>Vino</th><th>Cantina</th><th>Annata</th><th>Tag</th><th>Qtà</th><th>Listino</th><th>Sconto</th><th>Resell</th><th>Totale</th></tr></thead><tbody>${rows}</tbody></table></div><div class="order-card-actions"><div class="order-card-actions-left">${toggle}</div><div class="order-card-actions-right"><button class="btn small secondary" data-action="edit-order" data-id="${o.id}">Modifica dati</button><button class="btn small ghost" data-action="view-order" data-id="${o.id}">Apri dettaglio</button><button class="btn small ghost" data-action="duplicate-order" data-id="${o.id}">Duplica</button><button class="btn small danger" data-action="delete-order" data-id="${o.id}">Elimina</button></div></div></article>`;
   }
 
-  function renderVendite(){ const sales=filteredSales().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))); views.vendite.innerHTML=`<div class="section-head"><span class="small-muted">Ordini dei clienti, vendite e uscite dalla cantina.</span><button class="btn primary" data-action="new-sale">Nuovo ordine cliente</button></div><div class="card table-card">${sales.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Codice</th><th>Cliente</th><th>Stato</th><th>Pagamento</th><th>Mandati a</th><th>Bottiglie</th><th>Totale</th><th>Costo bottiglie</th><th>Margine</th><th>Note</th><th></th></tr></thead><tbody>${sales.map(s=>`<tr><td class="cell-title">${dateIT(s.date)}</td><td>${esc(s.code)}</td><td>${esc(customerName(s.customerId))}</td><td><span class="badge">${esc(s.status)}</span></td><td>${esc(s.paymentMethod||'—')}</td><td>${esc(s.paymentRecipient||'—')}</td><td>${number(s.totals?.quantity)}</td><td>${money(s.totals?.total)}</td><td>${money(s.totals?.cost)}</td><td>${money(s.totals?.margin)}</td><td>${esc(s.notes||'—')}</td><td><div class="actions"><button class="btn small secondary" data-action="edit-sale" data-id="${s.id}">Modifica</button><button class="btn small ghost" data-action="duplicate-sale" data-id="${s.id}">Duplica</button><button class="btn small danger" data-action="delete-sale" data-id="${s.id}">Elimina</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun ordine cliente registrato.</div>`}</div>`; bindInlineActions(); }
+  function renderVendite(){
+    const sales=filteredSales();
+    views.vendite.innerHTML=`<div class="section-head"><div class="filters"><select id="saleStatusFilter" class="filter"><option value="">Tutti gli stati</option>${SALE_STATUSES.map(x=>`<option value="${x}" ${saleFilters.status===x?'selected':''}>${x}</option>`).join('')}</select><select id="salePaymentFilter" class="filter"><option value="">Tutti i pagamenti</option>${PAYMENT_METHODS.map(x=>`<option value="${x}" ${saleFilters.payment===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleRecipientFilter" class="filter"><option value="">Tutti i destinatari</option>${PAYMENT_RECIPIENTS.map(x=>`<option value="${x}" ${saleFilters.recipient===x?'selected':''}>${x}</option>`).join('')}</select><select id="saleSort" class="filter"><option value="date:desc" ${saleFilters.sort==='date:desc'?'selected':''}>Ordina: data recente</option><option value="date:asc" ${saleFilters.sort==='date:asc'?'selected':''}>Ordina: data vecchia</option><option value="code:asc" ${saleFilters.sort==='code:asc'?'selected':''}>Ordina: numero ordine A-Z</option><option value="code:desc" ${saleFilters.sort==='code:desc'?'selected':''}>Ordina: numero ordine Z-A</option><option value="amount:desc" ${saleFilters.sort==='amount:desc'?'selected':''}>Ordina: importo alto</option><option value="amount:asc" ${saleFilters.sort==='amount:asc'?'selected':''}>Ordina: importo basso</option><option value="margin:desc" ${saleFilters.sort==='margin:desc'?'selected':''}>Ordina: margine alto</option><option value="customer:asc" ${saleFilters.sort==='customer:asc'?'selected':''}>Ordina: cliente A-Z</option></select></div><button class="btn primary" data-action="new-sale">Nuovo ordine cliente</button></div><div class="card table-card">${sales.length?`<div class="table-scroll"><table><thead><tr><th>Data</th><th>Codice</th><th>Cliente</th><th>Stato</th><th>Pagamento</th><th>Mandati a</th><th>Bottiglie</th><th>Totale</th><th>Costo bottiglie</th><th>Margine</th><th>Note</th><th></th></tr></thead><tbody>${sales.map(s=>`<tr><td class="cell-title">${dateIT(s.date)}</td><td>${esc(s.code)}</td><td>${esc(customerName(s.customerId))}</td><td><span class="badge">${esc(s.status)}</span></td><td>${esc(s.paymentMethod||'—')}</td><td>${esc(s.paymentRecipient||'—')}</td><td>${number(s.totals?.quantity)}</td><td>${money(s.totals?.total)}</td><td>${money(s.totals?.cost)}</td><td>${money(s.totals?.margin)}</td><td>${esc(s.notes||'—')}</td><td><div class="actions"><button class="btn small secondary" data-action="edit-sale" data-id="${s.id}">Modifica</button><button class="btn small ghost" data-action="duplicate-sale" data-id="${s.id}">Duplica</button><button class="btn small danger" data-action="delete-sale" data-id="${s.id}">Elimina</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty">Nessun ordine cliente registrato.</div>`}</div>`;
+    document.getElementById('saleStatusFilter')?.addEventListener('change',e=>{ saleFilters.status=e.target.value; renderVendite(); });
+    document.getElementById('salePaymentFilter')?.addEventListener('change',e=>{ saleFilters.payment=e.target.value; renderVendite(); });
+    document.getElementById('saleRecipientFilter')?.addEventListener('change',e=>{ saleFilters.recipient=e.target.value; renderVendite(); });
+    document.getElementById('saleSort')?.addEventListener('change',e=>{ saleFilters.sort=e.target.value; renderVendite(); });
+    bindInlineActions();
+  }
 
   function renderClienti(){ const customers=filteredCustomers().sort((a,b)=>a.name.localeCompare(b.name)); views.clienti.innerHTML=`<div class="section-head"><span class="small-muted">Lista clienti modificabile.</span><button class="btn primary" data-action="new-customer">Nuovo cliente</button></div><div class="card table-card">${customers.length?`<div class="table-scroll"><table><thead><tr><th>Nome</th><th>Tipologia</th><th>Email</th><th>Telefono</th><th>Ordini</th><th>Bottiglie</th><th>Totale speso</th><th>Note</th><th></th></tr></thead><tbody>${customers.map(c=>{ const sales=state.sales.filter(s=>s.customerId===c.id&&s.status!=='annullato'); const qty=sales.reduce((a,s)=>a+Number(s.totals?.quantity||0),0); const total=sales.reduce((a,s)=>a+Number(s.totals?.total||0),0); return `<tr><td class="cell-title">${esc(c.name)}</td><td>${esc(c.type||'—')}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${number(sales.length)}</td><td>${number(qty)}</td><td>${money(total)}</td><td>${esc(c.notes||'—')}</td><td><button class="btn small secondary" data-action="edit-customer" data-id="${c.id}">Modifica</button><button class="btn small danger" data-action="delete-customer" data-id="${c.id}">Elimina</button></td></tr>`;}).join('')}</tbody></table></div>`:`<div class="empty">Nessun cliente. Puoi aggiungerlo qui o durante un ordine cliente.</div>`}</div>`; bindInlineActions(); }
 
@@ -375,7 +443,7 @@
     const valOut = isMoney ? moneyInputValue(value) : (value ?? '');
     return `<div class="field"><label>${esc(label)}</label><input id="${htmlId}" class="${cls.trim()}" type="${inputType}" value="${esc(valOut)}" ${attrs}></div>`;
   }
-  function openModal({title,subtitle='',body,primary='Salva',onPrimary}){ const root=document.getElementById('modalRoot'); root.classList.add('active'); root.innerHTML=`<div class="modal-backdrop" data-close="1"></div><div class="modal"><div class="modal-header"><div><h2>${esc(title)}</h2>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div><button class="close" data-close="1">×</button></div><div class="modal-body">${body}</div><div class="modal-footer"><button class="btn secondary" data-close="1">Annulla</button><button class="btn primary" id="modalPrimary">${esc(primary)}</button></div></div>`; root.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',closeModal)); document.getElementById('modalPrimary').addEventListener('click',onPrimary); setTimeout(bindFormEnhancements,0); }
+  function openModal({title,subtitle='',body,primary='Salva',onPrimary,footerLeft=''}){ const root=document.getElementById('modalRoot'); root.classList.add('active'); root.innerHTML=`<div class="modal-backdrop" data-close="1"></div><div class="modal"><div class="modal-header"><div><h2>${esc(title)}</h2>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div><button class="close" data-close="1">×</button></div><div class="modal-body">${body}</div><div class="modal-footer" style="justify-content:space-between;align-items:center"><div class="modal-footer-left">${footerLeft||''}</div><div class="modal-footer-right" style="display:flex;gap:9px"><button class="btn secondary" data-close="1">Annulla</button><button class="btn primary" id="modalPrimary">${esc(primary)}</button></div></div></div>`; root.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',closeModal)); document.getElementById('modalPrimary').addEventListener('click',onPrimary); setTimeout(bindFormEnhancements,0); }
   function bindFormEnhancements(){
     document.querySelectorAll('.modal input, .modal select, .modal textarea').forEach(el=>{
       if(el.dataset.boundNav) return; el.dataset.boundNav='1';
@@ -904,12 +972,15 @@
       <div class="summary-box soft-summary" id="saleTotals" style="margin-top:16px"></div>
       <div class="field" style="margin-top:14px"><label>Note</label><textarea id="f_saleNotes">${esc(source?.notes||'')}</textarea></div>`,
       primary:isEdit?'Salva modifiche':'Salva ordine cliente',
+      footerLeft:'<button class="btn secondary" id="addSaleLineBottomBtn" type="button">+ Aggiungi vino</button>',
       onPrimary:()=>saveSaleFromModal(isEdit?old:null, source)
     });
 
     window.__saleLines=initialLines;
     renderSaleLines();
-    document.getElementById('addSaleLineBtn')?.addEventListener('click',()=>{ syncSaleLinesFromDom(); window.__saleLines.push(emptySaleLine()); renderSaleLines(); });
+    const addSaleLine=()=>{ syncSaleLinesFromDom(); window.__saleLines.push(emptySaleLine()); renderSaleLines(); };
+    document.getElementById('addSaleLineBtn')?.addEventListener('click',addSaleLine);
+    document.getElementById('addSaleLineBottomBtn')?.addEventListener('click',addSaleLine);
     document.getElementById('addCustomerInSale')?.addEventListener('click',()=>quickAddCustomer((cid,name)=>{ const sel=document.getElementById('f_saleCustomer'); sel.insertAdjacentHTML('beforeend',`<option value="${cid}">${esc(name)}</option>`); sel.value=cid; }));
     bindFormEnhancements();
   }
