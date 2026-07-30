@@ -1,18 +1,13 @@
 /* =========================================================
-   AMBIGUO DASHBOARD FINAL OVERRIDE
-   Solo dashboard: altezza grafici + spacing KPI
-   Caricato dopo styles.css
+   AMBIGUO DASHBOARD — FINAL SAFE OVERRIDE
+   - ripristina padding inferiore della dashboard
+   - mantiene KPI cards alte ma con testo allineato a sinistra
+   - evita che i grafici vadano attaccati al bordo basso
+   - non tocca sidebar, ordini, cantina o logica JS
    ========================================================= */
 
 @media (min-width: 1180px) {
   body:has(#view-dashboard.active) {
-    overflow: hidden !important;
-  }
-
-  .app-shell:has(#view-dashboard.active),
-  .layout:has(#view-dashboard.active) {
-    height: 100svh !important;
-    min-height: 100svh !important;
     overflow: hidden !important;
   }
 
@@ -23,7 +18,8 @@
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
-    padding-bottom: 24px !important;
+    padding-bottom: 34px !important;
+    box-sizing: border-box !important;
   }
 
   #view-dashboard.active {
@@ -34,16 +30,10 @@
     flex-direction: column !important;
     gap: 14px !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
-  #view-dashboard.active .page-head,
-  #view-dashboard.active .view-head,
-  #view-dashboard.active .section-head {
-    flex: 0 0 auto !important;
-    margin: 0 0 6px !important;
-  }
-
-  /* KPI: altezza confermata, contenuto più equilibrato */
+  /* KPI row */
   #view-dashboard.active .grid.cards {
     flex: 0 0 auto !important;
     display: grid !important;
@@ -53,39 +43,45 @@
   }
 
   #view-dashboard.active .stat-card {
-    height: 138px !important;
-    min-height: 138px !important;
-    padding: 22px 30px !important;
-    border-radius: 24px !important;
-    display: grid !important;
-    grid-template-rows: auto auto auto !important;
-    align-content: center !important;
-    row-gap: 14px !important;
+    height: 118px !important;
+    min-height: 118px !important;
+    padding: 22px 28px !important;
+    border-radius: 22px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+  }
+
+  #view-dashboard.active .stat-card * {
+    text-align: left !important;
   }
 
   #view-dashboard.active .stat-label {
     margin: 0 !important;
-    line-height: 1.05 !important;
-    font-size: 12px !important;
+    font-size: 11px !important;
+    line-height: 1.15 !important;
   }
 
   #view-dashboard.active .stat-value {
     margin: 0 !important;
-    line-height: 0.9 !important;
-    letter-spacing: -0.045em !important;
+    line-height: .95 !important;
   }
 
   #view-dashboard.active .stat-note {
     margin: 0 !important;
-    line-height: 1.15 !important;
-    font-size: 12px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
   }
 
-  /* Grafici: prendono tutto lo spazio rimasto fino all'altezza della sidebar */
+  /* Charts: 3x2, visibili, con padding sotto come le altre pagine */
   #view-dashboard.active .dashboard-charts-6 {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: 100% !important;
+    height: auto !important;
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
@@ -93,16 +89,18 @@
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
   #view-dashboard.active .chart-card {
-    height: 100% !important;
     min-height: 0 !important;
+    height: 100% !important;
     padding: 18px 20px 16px !important;
-    border-radius: 24px !important;
+    border-radius: 22px !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
   }
 
   #view-dashboard.active .chart-card h2,
@@ -110,14 +108,15 @@
     flex: 0 0 auto !important;
     margin: 0 0 10px !important;
     font-size: 15px !important;
-    line-height: 1.12 !important;
+    line-height: 1.15 !important;
+    text-align: left !important;
   }
 
   #view-dashboard.active .chart-wrap,
   #view-dashboard.active .chart-wrap.small {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    height: 100% !important;
+    height: auto !important;
     width: 100% !important;
     overflow: hidden !important;
   }
@@ -132,9 +131,9 @@
   }
 }
 
-@media (min-width: 1180px) and (max-height: 860px) {
+@media (min-width: 1180px) and (max-height: 850px) {
   .main:has(#view-dashboard.active) {
-    padding-bottom: 20px !important;
+    padding-bottom: 28px !important;
   }
 
   #view-dashboard.active {
@@ -142,13 +141,16 @@
   }
 
   #view-dashboard.active .stat-card {
-    height: 124px !important;
-    min-height: 124px !important;
-    padding: 18px 28px !important;
-    row-gap: 11px !important;
+    height: 108px !important;
+    min-height: 108px !important;
+    padding: 20px 26px !important;
   }
 
   #view-dashboard.active .dashboard-charts-6 {
     gap: 12px !important;
+  }
+
+  #view-dashboard.active .chart-card {
+    padding: 16px 18px 14px !important;
   }
 }
