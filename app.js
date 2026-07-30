@@ -274,9 +274,14 @@
         ${statCard('Incassato',money(st.salesGross),'Ordini clienti')}
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap"><canvas id="chartInventory"></canvas></div></div><div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap"><canvas id="chartBottles"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div><div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div></div>
-      <div class="grid two dashboard-charts"><div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div><div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div></div>`;
+      <div class="dashboard-charts dashboard-charts-6">
+        <div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap small"><canvas id="chartInventory"></canvas></div></div>
+        <div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap small"><canvas id="chartBottles"></canvas></div></div>
+        <div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div>
+        <div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div>
+        <div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div>
+        <div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div>
+      </div>`;
     drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
     drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
