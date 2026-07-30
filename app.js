@@ -727,59 +727,80 @@
     const selected=options.find(([id])=>String(id)===String(selectedId));
     const selectedLabel=selected ? selected[1] : '';
     const payload=encodeURIComponent(JSON.stringify(options));
-    return `<div class="field sale-wine-picker">
+    return `<div class="field sale-wine-picker" style="grid-column:span 2">
       <label>Vino</label>
-      <input id="f_s_${index}_wineSearch" class="wine-search-input" type="search" autocomplete="off" placeholder="Cerca codice, vino, cantina, annata..." value="${esc(selectedLabel)}">
-      <select id="f_s_${index}_wineId" data-all-options="${esc(payload)}">
-        ${options.map(([v,lab])=>`<option value="${esc(v)}" ${String(selectedId)===String(v)?'selected':''}>${esc(lab)}</option>`).join('')}
-      </select>
+      <div class="wine-search-row" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center">
+        <input id="f_s_${index}_wineSearch" class="wine-search-input" type="search" list="f_s_${index}_wineList" autocomplete="off" placeholder="Cerca codice, vino, cantina, annata..." value="${esc(selectedLabel)}" data-all-options="${esc(payload)}">
+        <input id="f_s_${index}_wineId" type="hidden" value="${esc(selectedId||'')}">
+        <button class="btn small secondary wine-search-select-btn" type="button" data-index="${index}">Cerca</button>
+        <datalist id="f_s_${index}_wineList">
+          ${options.map(([v,lab])=>`<option value="${esc(lab)}" data-id="${esc(v)}"></option>`).join('')}
+        </datalist>
+      </div>
     </div>`;
   }
 
-  function decodeWineOptions(select){
-    try { return JSON.parse(decodeURIComponent(select.dataset.allOptions || '%5B%5D')); }
+  function decodeWineOptionsFromInput(input){
+    try { return JSON.parse(decodeURIComponent(input.dataset.allOptions || '%5B%5D')); }
     catch(err){ return []; }
   }
 
-  function renderWineSelectOptions(select, options, selectedId){
-    select.innerHTML=options.map(([v,lab])=>`<option value="${esc(v)}" ${String(selectedId)===String(v)?'selected':''}>${esc(lab)}</option>`).join('');
+  function findWineOptionByQuery(options, query){
+    const q=String(query||'').toLowerCase().trim();
+    if(!q) return null;
+    const exact=options.find(([,label])=>String(label||'').toLowerCase()===q);
+    if(exact) return exact;
+    const starts=options.find(([,label])=>String(label||'').toLowerCase().startsWith(q));
+    if(starts) return starts;
+    return options.find(([,label])=>String(label||'').toLowerCase().includes(q)) || null;
+  }
+
+  function selectWineFromSearch(box, forceFirst=false){
+    const input=box.querySelector('.wine-search-input');
+    const hidden=box.querySelector('input[type="hidden"][id$="_wineId"]');
+    if(!input || !hidden) return false;
+    const all=decodeWineOptionsFromInput(input);
+    const match=findWineOptionByQuery(all, input.value) || (forceFirst ? all[0] : null);
+    if(!match) { toast('Nessun vino trovato.'); return false; }
+    hidden.value=match[0];
+    input.value=match[1];
+    hidden.dispatchEvent(new Event('change', { bubbles:true }));
+    return true;
   }
 
   function bindSaleWineSearch(){
     document.querySelectorAll('.sale-wine-picker').forEach(box=>{
       const input=box.querySelector('.wine-search-input');
-      const select=box.querySelector('select');
-      if(!input || !select) return;
-      const all=decodeWineOptions(select);
-      const applyFilter=()=>{
-        const current=select.value;
+      const hidden=box.querySelector('input[type="hidden"][id$="_wineId"]');
+      const btn=box.querySelector('.wine-search-select-btn');
+      const list=box.querySelector('datalist');
+      if(!input || !hidden) return;
+      const all=decodeWineOptionsFromInput(input);
+
+      const refreshList=()=>{
+        if(!list) return;
         const q=String(input.value||'').toLowerCase().trim();
-        let filtered=q ? all.filter(([,label])=>String(label||'').toLowerCase().includes(q)) : all;
-        if(current && !filtered.some(([id])=>String(id)===String(current))){
-          const selected=all.find(([id])=>String(id)===String(current));
-          if(selected) filtered=[selected,...filtered];
-        }
-        renderWineSelectOptions(select, filtered, current);
+        const filtered=(q ? all.filter(([,label])=>String(label||'').toLowerCase().includes(q)) : all).slice(0,40);
+        list.innerHTML=filtered.map(([v,lab])=>`<option value="${esc(lab)}" data-id="${esc(v)}"></option>`).join('');
       };
-      input.addEventListener('input', applyFilter);
-      input.addEventListener('keydown', e=>{
+
+      input.addEventListener('input',()=>{
+        refreshList();
+        const exact=findWineOptionByQuery(all, input.value);
+        if(exact && String(input.value).length>2){
+          hidden.value=exact[0];
+        }
+      });
+      input.addEventListener('keydown',e=>{
         if(e.key==='Enter'){
           e.preventDefault();
-          const first=select.options[0];
-          if(first){
-            select.value=first.value;
-            select.dispatchEvent(new Event('change', { bubbles:true }));
-          }
-        }
-        if(e.key==='ArrowDown'){
-          e.preventDefault();
-          select.focus();
+          selectWineFromSearch(box, true);
         }
       });
-      select.addEventListener('change',()=>{
-        const selected=all.find(([id])=>String(id)===String(select.value));
-        if(selected) input.value=selected[1];
+      input.addEventListener('change',()=>{
+        selectWineFromSearch(box, false);
       });
+      btn?.addEventListener('click',()=>selectWineFromSearch(box, true));
     });
   }
 
@@ -925,7 +946,7 @@
     }));
 
     bindSaleWineSearch();
-    root.querySelectorAll('select[id^="f_s_"][id$="_wineId"]').forEach(sel=>sel.addEventListener('change',()=>{
+    root.querySelectorAll('input[id^="f_s_"][id$="_wineId"]').forEach(sel=>sel.addEventListener('change',()=>{
       const i=Number(sel.id.match(/f_s_(\d+)_wineId/)?.[1]||0);
       const w=getWine(sel.value);
       syncSaleLinesFromDom();
