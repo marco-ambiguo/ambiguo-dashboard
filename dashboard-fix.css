@@ -1,126 +1,95 @@
 /* =========================================================
    AMBIGUO DASHBOARD FINAL OVERRIDE
-   Questo file viene caricato DOPO styles.css.
-   Non tocca dati, ordini, cantina o logica JS.
+   Solo dashboard: altezza grafici + spacing KPI
+   Caricato dopo styles.css
    ========================================================= */
 
-/* Reset degli override dashboard vecchi: fuori dalla dashboard il layout torna normale. */
-@media (min-width: 1180px) {
-  html,
-  body {
-    min-height: 100%;
-    height: auto;
-    overflow: auto !important;
-  }
-
-  .app-shell {
-    min-height: 100vh !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  .main {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    display: block !important;
-    padding: 12px 4px 24px !important;
-  }
-
-  .view.active:not(#view-dashboard) {
-    display: block !important;
-  }
-}
-
-/* Solo dashboard desktop: 100svh stabile, sidebar intatta. */
 @media (min-width: 1180px) {
   body:has(#view-dashboard.active) {
     overflow: hidden !important;
   }
 
-  .app-shell:has(#view-dashboard.active) {
+  .app-shell:has(#view-dashboard.active),
+  .layout:has(#view-dashboard.active) {
     height: 100svh !important;
     min-height: 100svh !important;
     overflow: hidden !important;
-    padding: 18px !important;
-    gap: 18px !important;
-    box-sizing: border-box !important;
-  }
-
-  .app-shell:has(#view-dashboard.active) .sidebar {
-    height: calc(100svh - 36px) !important;
-    max-height: calc(100svh - 36px) !important;
-    top: 18px !important;
   }
 
   .main:has(#view-dashboard.active) {
-    height: calc(100svh - 36px) !important;
-    max-height: calc(100svh - 36px) !important;
+    height: 100svh !important;
+    max-height: 100svh !important;
     min-height: 0 !important;
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
-    padding: 12px 4px 28px !important;
-    box-sizing: border-box !important;
-  }
-
-  .main:has(#view-dashboard.active) .topbar {
-    flex: 0 0 auto !important;
-    margin: 6px 0 16px !important;
+    padding-bottom: 24px !important;
   }
 
   #view-dashboard.active {
-    display: grid !important;
-    grid-template-rows: 128px minmax(0, 1fr) !important;
-    gap: 14px !important;
     flex: 1 1 auto !important;
     min-height: 0 !important;
     height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
     overflow: hidden !important;
   }
 
-  #view-dashboard.active > .grid.cards {
+  #view-dashboard.active .page-head,
+  #view-dashboard.active .view-head,
+  #view-dashboard.active .section-head {
+    flex: 0 0 auto !important;
+    margin: 0 0 6px !important;
+  }
+
+  /* KPI: altezza confermata, contenuto più equilibrato */
+  #view-dashboard.active .grid.cards {
+    flex: 0 0 auto !important;
     display: grid !important;
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
     gap: 14px !important;
-    height: 128px !important;
-    min-height: 128px !important;
     margin: 0 !important;
-    align-items: stretch !important;
   }
 
-  #view-dashboard.active > .grid.cards > .stat-card {
-    height: 128px !important;
-    min-height: 128px !important;
-    padding: 26px 26px 24px !important;
+  #view-dashboard.active .stat-card {
+    height: 138px !important;
+    min-height: 138px !important;
+    padding: 22px 30px !important;
     border-radius: 24px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    gap: 8px !important;
-    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-rows: auto auto auto !important;
+    align-content: center !important;
+    row-gap: 14px !important;
   }
 
-  #view-dashboard.active .stat-label,
-  #view-dashboard.active .stat-note {
+  #view-dashboard.active .stat-label {
     margin: 0 !important;
-    line-height: 1.15 !important;
+    line-height: 1.05 !important;
+    font-size: 12px !important;
   }
 
   #view-dashboard.active .stat-value {
     margin: 0 !important;
-    line-height: .95 !important;
+    line-height: 0.9 !important;
+    letter-spacing: -0.045em !important;
   }
 
-  #view-dashboard.active > .dashboard-charts-6,
-  #view-dashboard.active > .dashboard-charts.dashboard-charts-6 {
+  #view-dashboard.active .stat-note {
+    margin: 0 !important;
+    line-height: 1.15 !important;
+    font-size: 12px !important;
+  }
+
+  /* Grafici: prendono tutto lo spazio rimasto fino all'altezza della sidebar */
+  #view-dashboard.active .dashboard-charts-6 {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
     gap: 14px !important;
-    height: 100% !important;
-    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -134,7 +103,6 @@
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    box-sizing: border-box !important;
   }
 
   #view-dashboard.active .chart-card h2,
@@ -142,16 +110,15 @@
     flex: 0 0 auto !important;
     margin: 0 0 10px !important;
     font-size: 15px !important;
-    line-height: 1.15 !important;
-    letter-spacing: -0.012em !important;
+    line-height: 1.12 !important;
   }
 
   #view-dashboard.active .chart-wrap,
   #view-dashboard.active .chart-wrap.small {
     flex: 1 1 auto !important;
-    width: 100% !important;
-    height: auto !important;
     min-height: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
     overflow: hidden !important;
   }
 
@@ -165,50 +132,23 @@
   }
 }
 
-/* Schermi bassi: resta tutto visibile e mantiene padding sotto. */
-@media (min-width: 1180px) and (max-height: 850px) {
+@media (min-width: 1180px) and (max-height: 860px) {
   .main:has(#view-dashboard.active) {
-    padding-bottom: 24px !important;
+    padding-bottom: 20px !important;
   }
 
   #view-dashboard.active {
-    grid-template-rows: 112px minmax(0, 1fr) !important;
     gap: 12px !important;
   }
 
-  #view-dashboard.active > .grid.cards,
-  #view-dashboard.active > .grid.cards > .stat-card {
-    height: 112px !important;
-    min-height: 112px !important;
+  #view-dashboard.active .stat-card {
+    height: 124px !important;
+    min-height: 124px !important;
+    padding: 18px 28px !important;
+    row-gap: 11px !important;
   }
 
-  #view-dashboard.active > .grid.cards > .stat-card {
-    padding: 22px 24px !important;
-  }
-
-  #view-dashboard.active > .dashboard-charts-6,
-  #view-dashboard.active > .dashboard-charts.dashboard-charts-6 {
+  #view-dashboard.active .dashboard-charts-6 {
     gap: 12px !important;
-  }
-
-  #view-dashboard.active .chart-card {
-    padding: 16px 18px 14px !important;
-  }
-}
-
-/* Desktop molto larghi: più respiro nei KPI, senza rompere la viewport. */
-@media (min-width: 1500px) and (min-height: 900px) {
-  #view-dashboard.active {
-    grid-template-rows: 140px minmax(0, 1fr) !important;
-  }
-
-  #view-dashboard.active > .grid.cards,
-  #view-dashboard.active > .grid.cards > .stat-card {
-    height: 140px !important;
-    min-height: 140px !important;
-  }
-
-  #view-dashboard.active > .grid.cards > .stat-card {
-    padding: 30px 30px 28px !important;
   }
 }
