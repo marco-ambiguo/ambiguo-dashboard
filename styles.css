@@ -1248,3 +1248,171 @@ body {
   .dashboard-charts-6 .chart-card { padding: 13px 15px 12px !important; }
   .dashboard-charts-6 .chart-card h2 { font-size: 15px !important; margin-bottom: 6px !important; }
 }
+
+/* =========================================================
+   HOTFIX DASHBOARD 100SVH — KPI più alti + grafici fino in basso
+   ========================================================= */
+
+@media (min-width: 1100px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden !important;
+  }
+
+  .app-shell,
+  .layout,
+  .main-layout,
+  .app-main,
+  main {
+    min-height: 100svh !important;
+    height: 100svh !important;
+    overflow: hidden !important;
+  }
+
+  /* area dashboard */
+  .dashboard-view,
+  .dashboard-page,
+  .view-dashboard,
+  [data-view="dashboard"],
+  .page-dashboard {
+    height: calc(100svh - 34px) !important;
+    min-height: calc(100svh - 34px) !important;
+    display: grid !important;
+    grid-template-rows: auto auto 1fr !important;
+    gap: 14px !important;
+    overflow: hidden !important;
+  }
+
+  /* header dashboard più compatto ma pulito */
+  .dashboard-view .page-header,
+  .dashboard-page .page-header,
+  .view-dashboard .page-header,
+  .page-dashboard .page-header {
+    margin-bottom: 2px !important;
+  }
+
+  /* KPI: più alti, più respiro interno */
+  .stats-grid,
+  .kpi-grid,
+  .dashboard-stats,
+  .dashboard-kpis,
+  .metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .stat-card,
+  .kpi-card,
+  .metric-card,
+  .summary-card {
+    min-height: 104px !important;
+    padding: 22px 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+
+  .stat-card .value,
+  .kpi-card .value,
+  .metric-card .value,
+  .summary-card .value {
+    line-height: 0.95 !important;
+    margin-top: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* griglia grafici: 3 colonne x 2 righe, occupa tutto il resto */
+  .charts-grid,
+  .dashboard-charts,
+  .dashboard-grid,
+  .chart-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .chart-card,
+  .dashboard-chart-card,
+  .graph-card,
+  .panel.chart,
+  .card.chart-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 18px 20px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .chart-card h3,
+  .dashboard-chart-card h3,
+  .graph-card h3,
+  .panel.chart h3 {
+    margin: 0 0 8px !important;
+    line-height: 1.05 !important;
+  }
+
+  .chart-card svg,
+  .dashboard-chart-card svg,
+  .graph-card svg,
+  .panel.chart svg,
+  .chart-card canvas,
+  .dashboard-chart-card canvas,
+  .graph-card canvas,
+  .panel.chart canvas {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    display: block !important;
+  }
+
+  /* togli differenza di sfondo troppo evidente tra card e pagina */
+  .stat-card,
+  .kpi-card,
+  .metric-card,
+  .summary-card,
+  .chart-card,
+  .dashboard-chart-card,
+  .graph-card,
+  .panel.chart,
+  .card {
+    background: rgba(255, 255, 255, 0.58) !important;
+    backdrop-filter: blur(22px) saturate(1.05) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(1.05) !important;
+  }
+}
+
+/* su schermi bassi: tieni comunque tutto dentro */
+@media (min-width: 1100px) and (max-height: 850px) {
+  .stat-card,
+  .kpi-card,
+  .metric-card,
+  .summary-card {
+    min-height: 92px !important;
+    padding: 18px 22px !important;
+  }
+
+  .chart-card,
+  .dashboard-chart-card,
+  .graph-card,
+  .panel.chart,
+  .card.chart-card {
+    padding: 14px 16px 12px !important;
+  }
+
+  .charts-grid,
+  .dashboard-charts,
+  .dashboard-grid,
+  .chart-grid {
+    gap: 8px !important;
+  }
+}
+
