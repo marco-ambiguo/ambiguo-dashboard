@@ -790,6 +790,8 @@
           ${field('Vino',`s_${i}_wineId`,l.wineId,'selectPairs',options)}
           ${field('Disponibili',`s_${i}_available`,w?intQty(w.quantity):0,'number')}
           ${field('Quantità',`s_${i}_quantity`,l.quantity,'number')}
+          ${field('Costo pagato IVA incl.',`s_${i}_grossCostUnit`,w?lineTotals(w).grossUnit:0,'number')}
+          ${field('Costo selezionato',`s_${i}_grossCostTotal`,w?lineTotals(w).grossUnit*intQty(l.quantity||0):0,'number')}
           ${field('Prezzo resell base',`s_${i}_resaleBase`,w?Number(w.resalePrice||0):0,'number')}
           ${field('Prezzo applicato',`s_${i}_unitPrice`,l.unitPrice,'number')}
           ${field('Sconto €',`s_${i}_discount`,l.discount||0,'number')}
@@ -798,7 +800,7 @@
       </div>`;
     }).join('');
 
-    root.querySelectorAll('[id$="_available"],[id$="_resaleBase"]').forEach(el=>{ el.disabled=true; });
+    root.querySelectorAll('[id$="_available"],[id$="_resaleBase"],[id$="_grossCostUnit"],[id$="_grossCostTotal"]').forEach(el=>{ el.disabled=true; });
     root.querySelectorAll('[data-sale-line-action]').forEach(btn=>btn.addEventListener('click',()=>{
       syncSaleLinesFromDom();
       const i=Number(btn.dataset.index);
@@ -851,7 +853,9 @@
       totals.cost+=Number(l.costTotal||0);
       totals.margin=totals.total-totals.cost;
       const el=document.getElementById(`sale_line_total_${i}`);
-      if(el) el.innerHTML=`<div class="summary-row"><span>Resell base</span><strong>${money(w?.resalePrice||0)}</strong></div><div class="summary-row"><span>Prezzo applicato</span><strong>${money(l.unitPrice)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.total)}</strong></div>${l.manualPrice?`<div class="summary-row"><span>Nota</span><strong>Prezzo modificato manualmente</strong></div>`:''}`;
+      const grossCostUnit = w ? lineTotals(w).grossUnit : 0;
+      const grossCostTotal = grossCostUnit * intQty(l.quantity||0);
+      if(el) el.innerHTML=`<div class="summary-row"><span>Costo pagato / bottiglia</span><strong>${money(grossCostUnit)}</strong></div><div class="summary-row"><span>Costo selezionato</span><strong>${money(grossCostTotal)}</strong></div><div class="summary-row"><span>Resell base</span><strong>${money(w?.resalePrice||0)}</strong></div><div class="summary-row"><span>Prezzo applicato</span><strong>${money(l.unitPrice)}</strong></div><div class="summary-row"><span>Totale riga</span><strong>${money(t.total)}</strong></div>${l.manualPrice?`<div class="summary-row"><span>Nota</span><strong>Prezzo modificato manualmente</strong></div>`:''}`;
     });
     const root=document.getElementById('saleTotals');
     if(root) root.innerHTML=`<div class="summary-row"><span>Bottiglie</span><strong>${number(totals.quantity)}</strong></div><div class="summary-row"><span>Totale teorico</span><strong>${money(totals.theoretical)}</strong></div><div class="summary-row"><span>Sconti</span><strong>${money(totals.discount)}</strong></div><div class="summary-row"><span>Totale cliente</span><strong>${money(totals.total)}</strong></div><div class="summary-row"><span>Costo storico</span><strong>${money(totals.cost)}</strong></div><div class="summary-row"><span>Margine</span><strong>${money(totals.margin)}</strong></div>`;
