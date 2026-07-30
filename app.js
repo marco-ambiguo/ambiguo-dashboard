@@ -362,11 +362,25 @@
     btn?.setAttribute('aria-expanded','false');
   }
 
+  function applyCantinaStockFilter(wines, stockMode){
+    const qty = w => Number(w.quantity || 0);
+    const mode = stockMode || 'available';
+
+    // Default: la Cantina deve mostrare subito solo ciò che rimane davvero disponibile.
+    // Anche “Tutto lo stock” indica lo stock presente, quindi esclude sempre quantità 0.
+    if(mode === 'available' || mode === 'all') return wines.filter(w => qty(w) > 0);
+    if(mode === 'low') return wines.filter(w => qty(w) > 0 && qty(w) <= Number(state.settings.lowStockThreshold || 3));
+    if(mode === 'empty') return wines.filter(w => qty(w) <= 0);
+    return wines.filter(w => qty(w) > 0);
+  }
+
   function renderCantina(){
-    let wines=filteredWines(); wines.sort((a,b)=>sortCompare(a,b));
     const mode=window.__cantinaMode||'compact';
-    views.cantina.innerHTML=`<div class="section-head"><div class="filters"><select id="cantinaMode" class="filter"><option value="compact">Vista compatta</option><option value="full">Vista completa</option></select><select id="tagFilter" class="filter"><option value="">Tutti i tag</option>${TAGS.map(t=>`<option value="${t}">${t}</option>`).join('')}</select><select id="distributorFilter" class="filter"><option value="">Tutti i distributori</option>${activeDistributors().map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><select id="stockFilter" class="filter"><option value="">Tutto lo stock</option><option value="available">Disponibili</option><option value="low">Pochi pezzi</option><option value="empty">Esauriti</option></select><select id="cantinaSort" class="filter"><option value="name:asc">Ordina: nome A-Z</option><option value="lastPurchaseDate:desc">Ordina: data ordine recente</option><option value="tag:asc">Ordina: tipologia vino</option><option value="distributor:asc">Ordina: distributore</option><option value="quantity:desc">Ordina: quantità alta</option><option value="resaleTotal:desc">Ordina: valore resell</option><option value="grossTotal:desc">Ordina: costo stock</option></select></div><div class="actions"><button class="btn secondary" data-action="new-movement">Movimento</button><button class="btn primary" data-action="new-wine">Nuovo vino</button></div></div><div class="card table-card">${wines.length?cantinaTable(wines,mode):`<div class="empty">Cantina vuota.</div>`}</div>`;
+    const stockMode=window.__cantinaStockFilter||'available';
+    let wines=applyCantinaStockFilter(filteredWines(), stockMode); wines.sort((a,b)=>sortCompare(a,b));
+    views.cantina.innerHTML=`<div class="section-head"><div class="filters"><select id="cantinaMode" class="filter"><option value="compact">Vista compatta</option><option value="full">Vista completa</option></select><select id="tagFilter" class="filter"><option value="">Tutti i tag</option>${TAGS.map(t=>`<option value="${t}">${t}</option>`).join('')}</select><select id="distributorFilter" class="filter"><option value="">Tutti i distributori</option>${activeDistributors().map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><select id="stockFilter" class="filter"><option value="available">Disponibili</option><option value="all">Tutto lo stock</option><option value="low">Pochi pezzi</option><option value="empty">Esauriti</option></select><select id="cantinaSort" class="filter"><option value="name:asc">Ordina: nome A-Z</option><option value="lastPurchaseDate:desc">Ordina: data ordine recente</option><option value="tag:asc">Ordina: tipologia vino</option><option value="distributor:asc">Ordina: distributore</option><option value="quantity:desc">Ordina: quantità alta</option><option value="resaleTotal:desc">Ordina: valore resell</option><option value="grossTotal:desc">Ordina: costo stock</option></select></div><div class="actions"><button class="btn secondary" data-action="new-movement">Movimento</button><button class="btn primary" data-action="new-wine">Nuovo vino</button></div></div><div class="card table-card">${wines.length?cantinaTable(wines,mode):`<div class="empty">Nessun vino disponibile.</div>`}</div>`;
     const m=document.getElementById('cantinaMode'); if(m) m.value=mode;
+    const stock=document.getElementById('stockFilter'); if(stock) stock.value=stockMode;
     bindCantinaFilters(); bindInlineActions();
   }
   function sortValue(w,key){ const t=lineTotals(w); if(key==='distributor') return distributorName(w.distributorId); if(key==='discount') return discountLabel(w); if(key==='grossUnit') return t.grossUnit; if(key==='netTotal') return t.netTotal; if(key==='grossTotal') return t.grossTotal; if(key==='resaleTotal') return t.resaleTotal; if(key==='status') return wineStatus(w); if(key==='lastPurchaseDate') return w.lastOrderDate || w.lastPurchaseDate || w.createdAt || ''; return w[key]; }
@@ -382,15 +396,14 @@
     const mode=document.getElementById('cantinaMode'), tag=document.getElementById('tagFilter'), dist=document.getElementById('distributorFilter'), stock=document.getElementById('stockFilter'), sort=document.getElementById('cantinaSort');
     if(sort) sort.value=`${sortState.key}:${sortState.dir}`;
     if(mode) mode.value=window.__cantinaMode||'compact';
+    if(stock) stock.value=window.__cantinaStockFilter||'available';
     const apply=()=>{
       if(mode) window.__cantinaMode=mode.value;
       if(sort&&sort.value){ const [key,dir]=sort.value.split(':'); sortState={key,dir}; }
+      const stockMode = stock ? stock.value : 'available';
+      window.__cantinaStockFilter = stockMode || 'available';
       let wines=filteredWines().filter(w=>(!tag.value||w.tag===tag.value)&&(!dist.value||w.distributorId===dist.value));
-      const qty = w => Number(w.quantity || 0);
-      if(!stock.value) wines = wines.filter(w => qty(w) > 0);
-      if(stock.value==='available') wines=wines.filter(w=>qty(w)>0);
-      if(stock.value==='low') wines=wines.filter(w=>qty(w)>0 && qty(w)<=Number(state.settings.lowStockThreshold||3));
-      if(stock.value==='empty') wines=wines.filter(w=>qty(w)<=0);
+      wines = applyCantinaStockFilter(wines, window.__cantinaStockFilter);
       wines.sort((a,b)=>sortCompare(a,b));
       document.querySelector('#view-cantina .table-card').innerHTML=wines.length?cantinaTable(wines,window.__cantinaMode||'compact'):`<div class="empty">Nessun vino con questi filtri.</div>`;
       bindInlineActions(); bindSortHeaders();
