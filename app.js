@@ -357,7 +357,8 @@
         const delta=intQty(next.quantity)-intQty(before.quantity||0);
         Object.assign(before,next,{updatedAt:S.now()});
         if(delta!==0) addMovement(before.id,delta,'rettifica inventario',todayISO(),'Modifica quantità da scheda vino');
-        syncManualWineOrder(before, previous);
+        // Importante: modificare un vino dalla Cantina NON deve creare, spostare o duplicare ordini distributore.
+        // Gli ordini distributore restano storico dell'acquisto; dalla Cantina aggiorniamo solo la referenza e lo stock.
       } else {
         next.createdAt=S.now();
         state.wines.push(next);
@@ -397,6 +398,8 @@
     const line=wineToOrderLine(w);
     const idx=order.lines.findIndex(l=>l.sourceWineId===w.id);
     if(idx>=0) order.lines[idx]=line; else order.lines.push(line);
+    w.sourceOrderId = order.id;
+    w.manualStock = true;
     order.totals=calculateOrderTotals(order.lines);
     order.updatedAt=S.now();
   }
@@ -725,6 +728,24 @@
     if(event.key==='Escape') closeNotificationMenu();
   });
 
+  document.getElementById('cloudRefreshBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('cloudRefreshBtn');
+    try {
+      btn?.classList.add('is-loading');
+      btn?.setAttribute('disabled', 'disabled');
+      const onlineState = await S.refreshOnline();
+      state = onlineState;
+      render();
+      toast('Dati aggiornati dal cloud.');
+    } catch (error) {
+      console.warn('Refresh cloud fallito.', error);
+      toast('Non riesco ad aggiornare dal cloud. Controlla connessione o Redis.');
+    } finally {
+      btn?.classList.remove('is-loading');
+      btn?.removeAttribute('disabled');
+    }
+  });
+
   document.getElementById('quickOrderBtn')?.addEventListener('click', () => openOrderModal());
   document.getElementById('quickWineBtn')?.addEventListener('click', () => openWineModal());
   document.getElementById('quickSaleBtn')?.addEventListener('click', () => openSaleModal());
@@ -754,6 +775,10 @@
   window.addEventListener('ambiguo:onlineSaveError', event => {
     console.warn('Errore salvataggio online Redis.', event.detail?.error);
     if (typeof toast === 'function') toast('Salvataggio online non riuscito. Dati salvati solo localmente.');
+  });
+
+  window.addEventListener('ambiguo:onlineLoadError', event => {
+    console.warn('Errore caricamento online Redis.', event.detail?.error);
   });
 
   render();
