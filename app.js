@@ -3,6 +3,7 @@
   let state = S.load();
   const VIEW_KEY = 'ambiguo_current_view';
   let currentView = localStorage.getItem(VIEW_KEY) || 'dashboard';
+  let dashboardRange = localStorage.getItem('ambiguo_dashboard_range') || 'all';
   let sortState = { key: 'name', dir: 'asc' };
   let orderSortState = { key: 'date', dir: 'desc' };
   let searchTerm = '';
@@ -249,6 +250,73 @@
     return Object.entries(map).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value);
   }
 
+
+  function dashboardTrendData(range='all'){
+    const now=new Date();
+    const validDates=[];
+    state.orders.forEach(o=>validDates.push(parseDateFlexible(o.date||o.createdAt)));
+    state.sales.forEach(s=>validDates.push(parseDateFlexible(s.date||s.createdAt)));
+    state.movements.forEach(m=>validDates.push(parseDateFlexible(m.date||m.createdAt)));
+    state.wines.forEach(w=>validDates.push(parseDateFlexible(w.lastOrderDate||w.lastPurchaseDate||w.createdAt)));
+    const cleanDates=validDates.filter(d=>d && !Number.isNaN(d.getTime()));
+    const earliest=cleanDates.length ? new Date(Math.min(...cleanDates.map(d=>d.getTime()))) : new Date(now.getFullYear(),now.getMonth(),1);
+    const latest=cleanDates.length ? new Date(Math.max(...cleanDates.map(d=>d.getTime()), now.getTime())) : now;
+
+    function startOfDay(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+    function endOfDay(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59); }
+    function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+    function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
+    function monthLabel(d){ return d.toLocaleDateString('it-IT',{month:'short'}); }
+    function dayLabel(d){ return d.toLocaleDateString('it-IT',{day:'2-digit', month:'short'}); }
+
+    let buckets=[];
+    if(range==='1w'){
+      const start=addDays(startOfDay(latest),-6);
+      for(let i=0;i<7;i++){ const s=addDays(start,i), e=endOfDay(s); buckets.push({start:s,end:e,label:s.toLocaleDateString('it-IT',{weekday:'short'})}); }
+    } else if(range==='1m'){
+      const start=addDays(startOfDay(latest),-29);
+      for(let i=0;i<6;i++){ const s=addDays(start,i*5), e=i===5?endOfDay(latest):endOfDay(addDays(s,4)); buckets.push({start:s,end:e,label:dayLabel(s)}); }
+    } else if(range==='6m'){
+      const start=new Date(latest.getFullYear(),latest.getMonth()-5,1);
+      for(let i=0;i<6;i++){ const s=addMonths(start,i), e=new Date(s.getFullYear(),s.getMonth()+1,0,23,59,59); buckets.push({start:s,end:e,label:monthLabel(s)}); }
+    } else if(range==='1y'){
+      const start=new Date(latest.getFullYear(),latest.getMonth()-11,1);
+      for(let i=0;i<12;i++){ const s=addMonths(start,i), e=new Date(s.getFullYear(),s.getMonth()+1,0,23,59,59); buckets.push({start:s,end:e,label:monthLabel(s)}); }
+    } else {
+      const months=Math.max(6, Math.min(18, (latest.getFullYear()-earliest.getFullYear())*12 + latest.getMonth()-earliest.getMonth()+1));
+      const start=new Date(latest.getFullYear(),latest.getMonth()-months+1,1);
+      for(let i=0;i<months;i++){ const s=addMonths(start,i), e=new Date(s.getFullYear(),s.getMonth()+1,0,23,59,59); buckets.push({start:s,end:e,label:monthLabel(s)}); }
+    }
+
+    function within(date,b){ const d=parseDateFlexible(date||todayISO()); return d>=b.start && d<=b.end; }
+    function inventoryValueAt(endDate){
+      const qtyByWine={};
+      state.movements.forEach(move=>{
+        const d=parseDateFlexible(move.date||move.createdAt||todayISO());
+        if(!Number.isNaN(d.getTime()) && d<=endDate){ qtyByWine[move.wineId]=(qtyByWine[move.wineId]||0)+Number(move.quantityChange||0); }
+      });
+      const historical=Object.entries(qtyByWine).reduce((sum,[wineId,qty])=>{ const w=getWine(wineId); return sum + Math.max(0,qty)*Number(w?.resalePrice||0); },0);
+      if(historical>0) return historical;
+      // fallback per dati vecchi senza movimenti completi: mostra valore attuale sull'ultimo bucket utile
+      return 0;
+    }
+
+    const entries=[], exits=[], inventoryValue=[];
+    buckets.forEach((b,idx)=>{
+      let e=0, u=0;
+      state.orders.filter(o=>o.status!=='annullato' && within(o.date||o.createdAt,b)).forEach(o=>{ const t=o.totals||calculateOrderTotals(o.lines||[]); e+=Number(t.grossTotal||0); });
+      state.sales.filter(s=>s.status!=='annullato' && within(s.date||s.createdAt,b)).forEach(s=>{ const t=s.totals||calculateSaleTotals(s.lines||[]); u+=Number(t.total||0); });
+      entries.push(e);
+      exits.push(u);
+      inventoryValue.push(inventoryValueAt(b.end));
+    });
+    if(!inventoryValue.some(v=>v>0) && buckets.length){
+      const currentValue=state.wines.filter(w=>!w.archived && intQty(w.quantity)>0).reduce((sum,w)=>sum+Number(w.resalePrice||0)*intQty(w.quantity||0),0);
+      inventoryValue[inventoryValue.length-1]=currentValue;
+    }
+    return {labels:buckets.map(b=>b.label), entries, exits, inventoryValue};
+  }
+
   function render(){
     if (!views[currentView]) currentView = 'dashboard';
     localStorage.setItem(VIEW_KEY, currentView);
@@ -267,7 +335,12 @@
 
   function statCard(label,value,note){ return `<div class="card stat-card"><div class="stat-label">${esc(label)}</div><div class="stat-value">${esc(value)}</div><div class="stat-note">${esc(note||'')}</div></div>`; }
   function renderDashboard(){
-    const st=stats(); const months=monthlyData();
+    const st=stats();
+    const months=monthlyData();
+    const trend=dashboardTrendData(dashboardRange);
+    const rangeButtons=[
+      ['1w','1S'],['1m','1M'],['6m','6M'],['1y','1A'],['all','ALL']
+    ].map(([key,label])=>`<button type="button" class="chart-range-btn ${dashboardRange===key?'active':''}" data-dashboard-range="${key}">${label}</button>`).join('');
     views.dashboard.innerHTML=`
       <div class="grid cards">
         ${statCard('Bottiglie',number(st.bottles),`${st.wines.length} referenze`)}
@@ -276,20 +349,32 @@
         ${statCard('Incassato',money(st.salesGross),'Ordini clienti')}
         ${statCard('Valore potenziale',money(st.potentialValue),'Incassato + cantina')}
       </div>
-      <div class="dashboard-charts dashboard-charts-6">
-        <div class="card chart-card"><h2>Andamento cantina</h2><div class="chart-wrap small"><canvas id="chartInventory"></canvas></div></div>
+      <div class="dashboard-charts dashboard-charts-6 dashboard-charts-rework">
+        <div class="card chart-card chart-card-wide chart-card-trend">
+          <div class="chart-card-head">
+            <div>
+              <h2>Andamento cantina</h2>
+              <p>Entrate, uscite e valore bottiglie ancora in cantina.</p>
+            </div>
+            <div class="chart-range-tabs">${rangeButtons}</div>
+          </div>
+          <div class="chart-wrap trend-wrap"><canvas id="chartInventoryTrend"></canvas></div>
+        </div>
         <div class="card chart-card"><h2>Bottiglie entrate / uscite</h2><div class="chart-wrap small"><canvas id="chartBottles"></canvas></div></div>
-        <div class="card chart-card"><h2>Entrate / uscite €</h2><div class="chart-wrap small"><canvas id="chartCash"></canvas></div></div>
-        <div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div>
         <div class="card chart-card"><h2>Bottiglie per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagQty"></canvas></div></div>
         <div class="card chart-card"><h2>Valore resell per tipologia</h2><div class="chart-wrap small"><canvas id="chartTagValue"></canvas></div></div>
+        <div class="card chart-card"><h2>Acquisti per distributore</h2><div class="chart-wrap small"><canvas id="chartDistributor"></canvas></div></div>
       </div>`;
-    drawLineChart('chartInventory',months.map(m=>m.label),months.map(m=>m.value), 'Valore cantina');
+    drawMultiLineChart('chartInventoryTrend',trend.labels,[trend.entries,trend.exits,trend.inventoryValue],['Entrate','Uscite','Valore cantina'],[CHART_ORANGE, CHART_BLUE, CHART_GRAY]);
     drawBarChart('chartBottles',months.map(m=>m.label),[months.map(m=>m.inQty),months.map(m=>m.outQty)],['Entrate','Uscite']);
-    drawBarChart('chartCash',months.map(m=>m.label),[months.map(m=>m.spent),months.map(m=>m.sales)],['Spese','Incassi']);
-    drawDonutChart('chartDistributor',distributorBreakdown());
     drawSingleBarChart('chartTagQty',tagQuantityBreakdown(),'Bottiglie');
     drawDonutChart('chartTagValue',tagValueBreakdown());
+    drawDonutChart('chartDistributor',distributorBreakdown());
+    document.querySelectorAll('[data-dashboard-range]').forEach(btn=>btn.addEventListener('click',()=>{
+      dashboardRange=btn.dataset.dashboardRange||'all';
+      localStorage.setItem('ambiguo_dashboard_range', dashboardRange);
+      renderDashboard();
+    }));
     bindInlineActions();
   }
   function notificationRows(){
@@ -1176,10 +1261,51 @@
   function resetAll(){ if(!confirm('Prima conferma: vuoi cancellare tutti i dati?')) return; if(!confirm('Seconda conferma: questa azione non si può annullare.')) return; state=S.reset(); toast('Dati cancellati.'); render(); }
 
   const CHART_ORANGE = '#c36522';
+  const CHART_BLUE = '#4f7f9f';
+  const CHART_GREEN = '#5b9f73';
   const CHART_GRAY = '#8f8f8f';
   const CHART_GRAY_LIGHT = '#d8d3cd';
   const CHART_GRID = '#eee9e4';
   const CHART_TEXT = '#686868';
+
+  function chartTooltip(){
+    let tip=document.getElementById('chartTooltip');
+    if(!tip){
+      tip=document.createElement('div');
+      tip.id='chartTooltip';
+      tip.className='chart-hover-tooltip';
+      document.body.appendChild(tip);
+    }
+    return tip;
+  }
+  function hideChartTooltip(){ const tip=document.getElementById('chartTooltip'); if(tip) tip.classList.remove('show'); }
+  function setCanvasHover(c, hits){
+    c.__chartHits=hits||[];
+    c.onmousemove=(ev)=>{
+      const rect=c.getBoundingClientRect();
+      const x=ev.clientX-rect.left, y=ev.clientY-rect.top;
+      const hit=(c.__chartHits||[]).find(h=>{
+        if(h.type==='rect') return x>=h.x && x<=h.x+h.w && y>=h.y && y<=h.y+h.h;
+        if(h.type==='point') return Math.hypot(x-h.x,y-h.y)<=h.r;
+        if(h.type==='arc'){
+          const dx=x-h.cx, dy=y-h.cy, dist=Math.hypot(dx,dy);
+          if(dist<h.inner || dist>h.outer) return false;
+          let a=Math.atan2(dy,dx); if(a<-Math.PI/2) a+=Math.PI*2;
+          let s=h.start, e=h.end; if(s<-Math.PI/2) s+=Math.PI*2; if(e<-Math.PI/2) e+=Math.PI*2;
+          return a>=s && a<=e;
+        }
+        return false;
+      });
+      const tip=chartTooltip();
+      if(!hit){ tip.classList.remove('show'); c.style.cursor='default'; return; }
+      c.style.cursor='crosshair';
+      tip.innerHTML=`<strong>${esc(hit.title||'Dato')}</strong><span>${esc(hit.value||'')}</span>${hit.extra?`<small>${esc(hit.extra)}</small>`:''}`;
+      tip.style.left=(ev.clientX+14)+'px';
+      tip.style.top=(ev.clientY+14)+'px';
+      tip.classList.add('show');
+    };
+    c.onmouseleave=()=>{ c.style.cursor='default'; hideChartTooltip(); };
+  }
 
   function drawBarChart(id, labels, series, names){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
@@ -1190,8 +1316,9 @@
     const max=niceMax(Math.max(...vals,0));
     drawGrid(ctx,W,H,pad,labels,max,id==='chartCash');
     drawLegend(ctx,names,[CHART_ORANGE,CHART_GRAY],W,pad);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); setCanvasHover(c,[]); return; }
 
+    const hits=[];
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const groupW=plotW/labels.length;
     const barW=Math.max(12,Math.min(30,(groupW-18)/Math.max(series.length,1)));
@@ -1208,7 +1335,46 @@
       ctx.font='600 12px Host Grotesk';
       ctx.textAlign='center';
       ctx.fillText(id==='chartCash'?shortMoney(v):number(v),x+barW/2,Math.max(18,y-8));
+      hits.push({type:'rect',x,y,w:barW,h,title:`${names[si]} · ${labels[i]}`,value:id==='chartCash'?money(v):number(v)});
     }));
+    setCanvasHover(c,hits);
+  }
+
+  function drawMultiLineChart(id, labels, series, names, colors){
+    const c=document.getElementById(id); if(!c)return; setupCanvas(c);
+    const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
+    const pad={l:62,r:42,t:58,b:48};
+    ctx.clearRect(0,0,W,H);
+    const max=niceMax(Math.max(...series.flat().map(v=>Number(v||0)),0));
+    drawGrid(ctx,W,H,pad,labels,max,true);
+    drawLegend(ctx,names,colors,W,pad);
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); setCanvasHover(c,[]); return; }
+    const hits=[];
+    const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+    const step=plotW/Math.max(labels.length-1,1);
+    series.forEach((values,si)=>{
+      const points=values.map((v,i)=>({x:pad.l+i*step,y:pad.t+plotH-(plotH*(Number(v||0)/max)),v:Number(v||0),i}));
+      // area solo per valore cantina, più morbida
+      if(si===2 && points.length){
+        ctx.beginPath();
+        points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+        ctx.lineTo(points[points.length-1].x,pad.t+plotH);
+        ctx.lineTo(points[0].x,pad.t+plotH);
+        ctx.closePath();
+        ctx.fillStyle='rgba(143,143,143,.07)'; ctx.fill();
+      }
+      ctx.strokeStyle=colors[si%colors.length];
+      ctx.lineWidth=si===2?3:2.5;
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.beginPath(); points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke();
+      points.forEach((p,i)=>{
+        if(p.v<=0 && labels.length>8) return;
+        ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,si===2?4.6:4,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle=colors[si%colors.length]; ctx.lineWidth=2.4; ctx.stroke();
+        hits.push({type:'point',x:p.x,y:p.y,r:12,title:`${names[si]} · ${labels[i]}`,value:money(p.v)});
+      });
+    });
+    setCanvasHover(c,hits);
   }
 
   function drawLineChart(id, labels, values, label=''){
@@ -1218,112 +1384,68 @@
     ctx.clearRect(0,0,W,H);
     const max=niceMax(Math.max(...values.map(v=>Number(v||0)),0));
     drawGrid(ctx,W,H,pad,labels,max,true);
-    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); return; }
+    if(max<=0){ drawEmptyChart(ctx,W,H,'Nessun movimento ancora'); setCanvasHover(c,[]); return; }
 
+    const hits=[];
     const plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
     const step=plotW/Math.max(labels.length-1,1);
-    const points=values.map((v,i)=>({
-      x:pad.l+i*step,
-      y:pad.t+plotH-(plotH*(Number(v||0)/max)),
-      v:Number(v||0)
-    }));
+    const points=values.map((v,i)=>({ x:pad.l+i*step, y:pad.t+plotH-(plotH*(Number(v||0)/max)), v:Number(v||0) }));
 
     ctx.beginPath();
     points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
     ctx.lineTo(points[points.length-1].x,pad.t+plotH);
     ctx.lineTo(points[0].x,pad.t+plotH);
-    ctx.closePath();
-    ctx.fillStyle='rgba(195,101,34,.08)';
-    ctx.fill();
+    ctx.closePath(); ctx.fillStyle='rgba(195,101,34,.08)'; ctx.fill();
 
-    ctx.strokeStyle=CHART_ORANGE;
-    ctx.lineWidth=3;
-    ctx.lineJoin='round';
-    ctx.lineCap='round';
-    ctx.beginPath();
-    points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
-    ctx.stroke();
-
-    points.forEach((p,i)=>{
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle=CHART_ORANGE; ctx.lineWidth=3; ctx.stroke();
-      if(i===points.length-1 && p.v>0){
-        const txt=shortMoney(p.v);
-        ctx.font='600 12px Host Grotesk';
-        ctx.textAlign='right';
-        ctx.fillStyle=CHART_TEXT;
-        ctx.fillText(txt,Math.min(W-pad.r,p.x+24),Math.max(18,p.y-12));
-      }
-    });
+    ctx.strokeStyle=CHART_ORANGE; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); points.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke();
+    points.forEach((p,i)=>{ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle=CHART_ORANGE; ctx.lineWidth=3; ctx.stroke(); hits.push({type:'point',x:p.x,y:p.y,r:12,title:`${label||'Valore'} · ${labels[i]}`,value:money(p.v)}); });
+    setCanvasHover(c,hits);
   }
 
   function drawSingleBarChart(id, items, label='Valore'){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); return; }
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun dato per ora'); setCanvasHover(c,[]); return; }
+    const hits=[];
     const pad={l:116,r:38,t:34,b:30};
     const max=niceMax(Math.max(...items.map(i=>Number(i.value||0)),0));
     const plotW=W-pad.l-pad.r;
     const rowH=Math.min(34, Math.max(24,(H-pad.t-pad.b)/Math.max(items.length,1)));
-    ctx.fillStyle=CHART_TEXT;
-    ctx.font='600 12px Host Grotesk';
-    ctx.textAlign='left';
-    ctx.fillText(label,pad.l,pad.t-12);
+    ctx.fillStyle=CHART_TEXT; ctx.font='600 12px Host Grotesk'; ctx.textAlign='left'; ctx.fillText(label,pad.l,pad.t-12);
     items.slice(0,7).forEach((it,i)=>{
-      const y=pad.t+i*rowH;
-      const value=Number(it.value||0);
-      ctx.fillStyle=CHART_TEXT;
-      ctx.font='600 13px Host Grotesk';
-      ctx.textAlign='right';
-      ctx.fillText(String(it.label),pad.l-14,y+14);
-      ctx.fillStyle='rgba(0,0,0,.06)';
-      roundRect(ctx,pad.l,y,plotW,14,7); ctx.fill();
-      ctx.fillStyle=i===0?CHART_ORANGE:CHART_GRAY;
-      roundRect(ctx,pad.l,y,Math.max(6,plotW*(value/max)),14,7); ctx.fill();
-      ctx.fillStyle='#111';
-      ctx.font='700 12px Host Grotesk';
-      ctx.textAlign='left';
-      ctx.fillText(number(value),pad.l+Math.max(10,plotW*(value/max))+8,y+12);
+      const y=pad.t+i*rowH, value=Number(it.value||0), bw=Math.max(6,plotW*(value/max));
+      ctx.fillStyle=CHART_TEXT; ctx.font='600 13px Host Grotesk'; ctx.textAlign='right'; ctx.fillText(String(it.label),pad.l-14,y+14);
+      ctx.fillStyle='rgba(0,0,0,.06)'; roundRect(ctx,pad.l,y,plotW,14,7); ctx.fill();
+      ctx.fillStyle=i===0?CHART_ORANGE:CHART_GRAY; roundRect(ctx,pad.l,y,bw,14,7); ctx.fill();
+      ctx.fillStyle='#111'; ctx.font='700 12px Host Grotesk'; ctx.textAlign='left'; ctx.fillText(number(value),pad.l+bw+8,y+12);
+      hits.push({type:'rect',x:pad.l,y,w:plotW,h:16,title:String(it.label),value:number(value),extra:label});
     });
+    setCanvasHover(c,hits);
   }
 
   function drawDonutChart(id,items){
     const c=document.getElementById(id); if(!c)return; setupCanvas(c);
     const ctx=c.getContext('2d'), W=c._chartW||c.width, H=c._chartH||c.height;
     ctx.clearRect(0,0,W,H);
-    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); return; }
+    if(!items.length){ drawEmptyChart(ctx,W,H,'Nessun acquisto ancora'); setCanvasHover(c,[]); return; }
+    const hits=[];
     const total=items.reduce((s,i)=>s+Number(i.value||0),0);
     const colors=[CHART_ORANGE, CHART_GRAY, CHART_GRAY_LIGHT, '#b9b2aa', '#eee9e4'];
     const cx=W*.36, cy=H*.56, r=Math.min(W,H)*.28, width=r*.38;
     let start=-Math.PI/2;
     items.forEach((it,i)=>{
       const a=(Number(it.value||0)/total)*Math.PI*2;
-      ctx.beginPath();
-      ctx.arc(cx,cy,r,start,start+a);
-      ctx.lineWidth=width;
-      ctx.strokeStyle=colors[i%colors.length];
-      ctx.lineCap='butt';
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,r,start,start+a); ctx.lineWidth=width; ctx.strokeStyle=colors[i%colors.length]; ctx.lineCap='butt'; ctx.stroke();
+      hits.push({type:'arc',cx,cy,inner:r-width/2,outer:r+width/2,start,end:start+a,title:String(it.label),value:money(it.value),extra:`${Math.round((Number(it.value||0)/total)*100)}%`});
       start+=a;
     });
-    ctx.fillStyle=CHART_TEXT;
-    ctx.font='500 12px Host Grotesk';
-    ctx.textAlign='center';
-    ctx.fillText('Totale',cx,cy-4);
-    ctx.fillStyle='#111';
-    ctx.font='700 16px Host Grotesk';
-    ctx.fillText(shortMoney(total),cx,cy+18);
-
+    ctx.fillStyle=CHART_TEXT; ctx.font='500 12px Host Grotesk'; ctx.textAlign='center'; ctx.fillText('Totale',cx,cy-4);
+    ctx.fillStyle='#111'; ctx.font='700 16px Host Grotesk'; ctx.fillText(shortMoney(total),cx,cy+18);
     ctx.textAlign='left';
-    items.slice(0,5).forEach((it,i)=>{
-      const y=42+i*28;
-      ctx.fillStyle=colors[i%colors.length];
-      roundRect(ctx,W*.58,y-10,12,12,3); ctx.fill();
-      ctx.fillStyle='#111';
-      ctx.font='600 13px Host Grotesk';
-      ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+22,y);
-    });
+    items.slice(0,5).forEach((it,i)=>{ const y=42+i*28; ctx.fillStyle=colors[i%colors.length]; roundRect(ctx,W*.58,y-10,12,12,3); ctx.fill(); ctx.fillStyle='#111'; ctx.font='600 13px Host Grotesk'; ctx.fillText(`${it.label} · ${shortMoney(it.value)}`,W*.58+22,y); });
+    setCanvasHover(c,hits);
   }
 
   function drawEmptyChart(ctx,W,H,message){
@@ -1338,15 +1460,9 @@
     const dpr=Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW=Math.max(320, Math.floor(r.width));
     const cssH=Math.max(180, Math.floor(r.height));
-    c.style.width=cssW+'px';
-    c.style.height=cssH+'px';
-    c.width=Math.floor(cssW*dpr);
-    c.height=Math.floor(cssH*dpr);
-    c._chartW=cssW;
-    c._chartH=cssH;
-    c._chartDpr=dpr;
-    const ctx=c.getContext('2d');
-    ctx.setTransform(dpr,0,0,dpr,0,0);
+    c.style.width=cssW+'px'; c.style.height=cssH+'px'; c.width=Math.floor(cssW*dpr); c.height=Math.floor(cssH*dpr);
+    c._chartW=cssW; c._chartH=cssH; c._chartDpr=dpr;
+    const ctx=c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
   }
   function niceMax(v){
     if(v<=0) return 0;
@@ -1366,20 +1482,13 @@
       if(max>0){ const val=max-(max*i/3); ctx.fillText(isMoney?shortMoney(val):number(Math.round(val)),pad.l-10,y+4); }
     }
     ctx.textAlign='center';
-    labels.forEach((l,i)=>{
-      const x=pad.l+i*(plotW/Math.max(labels.length-1,1));
-      ctx.fillText(l,x,pad.t+plotH+28);
-    });
+    const skip=labels.length>8?Math.ceil(labels.length/6):1;
+    labels.forEach((l,i)=>{ if(i%skip!==0 && i!==labels.length-1) return; const x=pad.l+i*(plotW/Math.max(labels.length-1,1)); ctx.fillText(l,x,pad.t+plotH+28); });
   }
   function drawLegend(ctx,names,colors,W,pad){
-    ctx.font='600 12px Host Grotesk';
-    ctx.textAlign='left';
-    const startX=Math.max(pad.l,W-pad.r-150);
-    names.forEach((n,i)=>{
-      const y=22+i*18;
-      ctx.fillStyle=colors[i%colors.length]; roundRect(ctx,startX,y-9,10,10,2); ctx.fill();
-      ctx.fillStyle=CHART_TEXT; ctx.fillText(n,startX+16,y);
-    });
+    ctx.font='600 12px Host Grotesk'; ctx.textAlign='left';
+    const startX=Math.max(pad.l,W-pad.r-180);
+    names.forEach((n,i)=>{ const y=22+i*18; ctx.fillStyle=colors[i%colors.length]; roundRect(ctx,startX,y-9,10,10,2); ctx.fill(); ctx.fillStyle=CHART_TEXT; ctx.fillText(n,startX+16,y); });
   }
   function shortMoney(v){ return money(v).replace(',00',''); }
   function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
